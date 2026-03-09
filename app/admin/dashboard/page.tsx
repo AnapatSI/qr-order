@@ -82,9 +82,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        console.log('🔍 Dashboard: Checking user...')
         const user = await getUser()
+        console.log('👤 Dashboard: User data:', user)
+        
         if (!user) {
-          console.log('No user found, redirecting to login...')
+          console.log('❌ Dashboard: No user found, redirecting to login...')
           router.replace('/login')
           setLoading(false)
           return
