@@ -105,7 +105,14 @@ export default function AdminDashboard() {
 
         if (storeError) {
           console.error('❌ Store fetch error:', storeError)
-          // Don't redirect, just show empty dashboard
+          console.log('🏪 No store found, showing empty dashboard')
+          // Don't redirect, just show empty dashboard with setup message
+          setLoading(false)
+          return
+        }
+
+        if (!storeData) {
+          console.log('🏪 No store data, showing empty dashboard')
           setLoading(false)
           return
         }
