@@ -43,9 +43,9 @@ export default function LoginPage() {
         
         setLoading(false)
         
-        // Simple direct redirect - use Next.js router instead
-        console.log('🚀 Redirecting to success page...')
-        router.push('/login-success')
+        // Simple direct redirect - ไม่ตรวจสองอะไรเลย
+        console.log('🚀 Redirecting to simple dashboard...')
+        window.location.href = '/admin/dashboard-simple'
       } else {
         console.error('❌ No user data returned')
         setError('Login failed. Please try again.')
