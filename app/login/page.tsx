@@ -43,9 +43,10 @@ export default function LoginPage() {
         
         setLoading(false)
         
-        // Simple direct redirect - no session checks needed
-        console.log('🚀 Redirecting to SIMPLE dashboard...')
-        window.location.replace('/admin/dashboard-simple')
+        // Simple direct redirect - use Next.js router instead
+        console.log('🚀 Redirecting to SIMPLE dashboard with Next.js router...')
+        router.push('/admin/dashboard-simple')
+        router.replace('/admin/dashboard-simple')
       } else {
         console.error('❌ No user data returned')
         setError('Login failed. Please try again.')
