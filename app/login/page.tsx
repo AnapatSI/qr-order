@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signIn } from '@/lib/supabase-auth-simple'
+import { supabaseAuth } from '@/lib/supabase-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -45,25 +46,19 @@ export default function LoginPage() {
         // Wait for session to be established before redirect
         console.log('⏳ Waiting for session to propagate...')
         
-        setTimeout(async () => {
-          console.log('📍 Method 1: window.location.href')
-          window.location.href = '/admin/dashboard'
-        }, 1000)
-        
-        // Fallback methods
-        setTimeout(() => {
-          if (window.location.pathname === '/login') {
-            console.log('📍 Method 2: window.location.replace')
-            window.location.replace('/admin/dashboard')
+        // Check if session is established before redirecting
+        const checkSession = async () => {
+          const { data: { session } } = await supabaseAuth.auth.getSession()
+          if (session) {
+            console.log('✅ Session established, redirecting...')
+            window.location.href = '/admin/dashboard'
+          } else {
+            console.log('❌ Session not ready, retrying...')
+            setTimeout(checkSession, 500)
           }
-        }, 3000)
+        }
         
-        setTimeout(() => {
-          if (window.location.pathname === '/login') {
-            console.log('📍 Method 3: router.replace')
-            router.replace('/admin/dashboard')
-          }
-        }, 5000)
+        setTimeout(checkSession, 1000)
       } else {
         console.error('❌ No user data returned')
         setError('Login failed. Please try again.')
