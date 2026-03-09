@@ -63,7 +63,7 @@ export default function SimpleDebug() {
         }
         
       } catch (error) {
-        addLog(`💥 Error: ${error.message}`)
+        addLog(`💥 Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
     
