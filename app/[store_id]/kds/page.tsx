@@ -52,12 +52,19 @@ export default function KDSPage({ params }: { params: Promise<{ store_id: string
   }
 
   useEffect(() => {
-    console.log('🔍 Setting up KDS real-time for store:', storeId)
-    fetchOrders()
+    if (storeId) {
+      fetchOrders()
+    }
+  }, [storeId])
 
-    // Subscribe to orders table changes
-    const ordersChannel = supabase
-      .channel(`orders_${storeId}`)
+  useEffect(() => {
+    if (!storeId) return
+
+    console.log('� Setting up real-time subscriptions for store:', storeId)
+
+    // Subscribe to orders table
+    const ordersSubscription = supabase
+      .channel('orders-changes')
       .on(
         'postgres_changes',
         {
@@ -67,27 +74,17 @@ export default function KDSPage({ params }: { params: Promise<{ store_id: string
           filter: `store_id=eq.${storeId}`
         },
         (payload) => {
-          console.log('📢 Orders real-time update received:', payload)
-          console.log('📢 Event type:', payload.eventType)
-          console.log('📢 New record:', payload.new)
-          console.log('📢 Old record:', payload.old)
-          
-          // Fetch fresh data
+          console.log('� Orders table change:', payload)
           fetchOrders()
         }
       )
       .subscribe((status) => {
         console.log('📡 Orders subscription status:', status)
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Orders real-time connected successfully')
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Orders real-time connection failed')
-        }
       })
 
-    // Also subscribe to order_items changes
-    const orderItemsChannel = supabase
-      .channel(`order_items_${storeId}`)
+    // Subscribe to order_items table
+    const orderItemsSubscription = supabase
+      .channel('order-items-changes')
       .on(
         'postgres_changes',
         {
@@ -96,59 +93,144 @@ export default function KDSPage({ params }: { params: Promise<{ store_id: string
           table: 'order_items'
         },
         (payload) => {
-          console.log('� Order items real-time update received:', payload)
-          // Fetch fresh data when order items change
+          console.log('🔔 Order items table change:', payload)
           fetchOrders()
         }
       )
       .subscribe((status) => {
         console.log('📡 Order items subscription status:', status)
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Order items real-time connected successfully')
-        }
       })
 
-    // Fallback: Poll every 5 seconds if real-time fails
-    const pollInterval = setInterval(() => {
-      console.log('🔄 Polling for orders (fallback)')
+    // Fallback polling every 5 seconds
+    const pollingInterval = setInterval(() => {
+      console.log('⏰ Polling for orders...')
       fetchOrders()
     }, 5000)
 
     return () => {
-      console.log('�🔌 Unsubscribing from KDS real-time')
-      supabase.removeChannel(ordersChannel)
-      supabase.removeChannel(orderItemsChannel)
-      clearInterval(pollInterval)
+      console.log('🧹 Cleaning up subscriptions')
+      ordersSubscription.unsubscribe()
+      orderItemsSubscription.unsubscribe()
+      clearInterval(pollingInterval)
     }
   }, [storeId])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-4">
-        <div className="text-center text-2xl">Loading orders...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading orders...</p>
+        </div>
       </div>
     )
   }
 
+  const pendingOrders = orders.filter(order => order.status === 'pending')
+  const cookingOrders = orders.filter(order => order.status === 'cooking')
+  const servedOrders = orders.filter(order => order.status === 'served')
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8 text-center">Kitchen Display System</h1>
-        
-        {orders.length === 0 ? (
-          <div className="text-center text-2xl text-gray-400 py-12">
-            No active orders
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">Kitchen Display</h1>
+              <p className="text-sm text-gray-500">Store: {storeId}</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <div className="text-sm text-gray-500">Active Orders</div>
+                <div className="text-xl font-bold text-blue-600">{orders.length}</div>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {orders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onUpdate={fetchOrders}
-                storeId={storeId}
-              />
-            ))}
+        </div>
+      </div>
+
+      {/* Order Status Tabs - Mobile First */}
+      <div className="p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Pending Orders */}
+          <div className="space-y-4">
+            <div className="bg-red-100 border border-red-200 rounded-lg p-3">
+              <h2 className="text-lg font-bold text-red-800">Pending ({pendingOrders.length})</h2>
+              <p className="text-sm text-red-600">New orders to start</p>
+            </div>
+            <div className="space-y-3">
+              {pendingOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  storeId={storeId}
+                  onUpdate={fetchOrders}
+                />
+              ))}
+              {pendingOrders.length === 0 && (
+                <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
+                  <div className="text-gray-400 text-4xl mb-2">⏳</div>
+                  <p className="text-gray-600">No pending orders</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Cooking Orders */}
+          <div className="space-y-4">
+            <div className="bg-yellow-100 border border-yellow-200 rounded-lg p-3">
+              <h2 className="text-lg font-bold text-yellow-800">Cooking ({cookingOrders.length})</h2>
+              <p className="text-sm text-yellow-600">Orders in progress</p>
+            </div>
+            <div className="space-y-3">
+              {cookingOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  storeId={storeId}
+                  onUpdate={fetchOrders}
+                />
+              ))}
+              {cookingOrders.length === 0 && (
+                <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
+                  <div className="text-gray-400 text-4xl mb-2">👨‍🍳</div>
+                  <p className="text-gray-600">No orders cooking</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Served Orders */}
+          <div className="space-y-4">
+            <div className="bg-green-100 border border-green-200 rounded-lg p-3">
+              <h2 className="text-lg font-bold text-green-800">Served ({servedOrders.length})</h2>
+              <p className="text-sm text-green-600">Ready for pickup</p>
+            </div>
+            <div className="space-y-3">
+              {servedOrders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  storeId={storeId}
+                  onUpdate={fetchOrders}
+                />
+              ))}
+              {servedOrders.length === 0 && (
+                <div className="text-center py-8 bg-white rounded-lg border border-gray-200">
+                  <div className="text-gray-400 text-4xl mb-2">✅</div>
+                  <p className="text-gray-600">No served orders</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {orders.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-6xl mb-4">🍽️</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No active orders</h3>
+            <p className="text-gray-600">New orders will appear here automatically.</p>
           </div>
         )}
       </div>

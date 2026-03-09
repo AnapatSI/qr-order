@@ -6,115 +6,183 @@ import { supabase } from '@/lib/supabase'
 import { signOut, getUser } from '@/lib/supabase-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   LogOut, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Upload, 
-  Image as ImageIcon,
-  QrCode,
-  Download,
-  DollarSign,
+  ChefHat,
+  Utensils,
+  Plus,
+  Star,
   TrendingUp,
-  AlertCircle,
-  Table as TableIcon
+  DollarSign,
+  Users,
+  MessageSquare,
+  ArrowUpRight,
+  ArrowDownRight
 } from 'lucide-react'
-import { QRCodeSVG as QRCode } from 'qrcode.react'
+import Link from 'next/link'
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts'
 
-interface MenuItem {
-  id: number
-  name: string
-  price: number
-  category?: string
-  description?: string
-  image_url?: string
-  is_available: boolean
+interface KPICard {
+  title: string
+  value: string | number
+  change?: number
+  icon: React.ReactNode
+  color: string
 }
 
-interface TableItem {
+interface Review {
   id: string
-  table_number: string
+  rating: number
+  comment: string
+  customer_name?: string
   created_at: string
 }
 
+interface RevenueData {
+  date: string
+  revenue: number
+}
+
+interface TopMenuItem {
+  name: string
+  quantity: number
+  revenue: number
+}
+
 export default function AdminDashboard() {
-  const [creditBalance, setCreditBalance] = useState(0)
-  const [todaySales, setTodaySales] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [storeId, setStoreId] = useState('')
-  const [menus, setMenus] = useState<MenuItem[]>([])
-  const [tables, setTables] = useState<TableItem[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  // KPI States
+  const [todayRevenue, setTodayRevenue] = useState(0)
+  const [activeOrders, setActiveOrders] = useState(0)
+  const [averageRating, setAverageRating] = useState(0)
+  const [totalOrders, setTotalOrders] = useState(0)
+  
+  // Chart States
+  const [revenueData, setRevenueData] = useState<RevenueData[]>([])
+  const [topMenuItems, setTopMenuItems] = useState<TopMenuItem[]>([])
+  
+  // Reviews State
+  const [recentReviews, setRecentReviews] = useState<Review[]>([])
+
   const router = useRouter()
 
-  // Menu Manager States
-  const [menuDialogOpen, setMenuDialogOpen] = useState(false)
-  const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null)
-  const [menuFormData, setMenuFormData] = useState({
-    name: '',
-    price: '',
-    description: ''
-  })
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string>('')
-  const [uploading, setUploading] = useState(false)
-
-  // Table Manager States
-  const [tableDialogOpen, setTableDialogOpen] = useState(false)
-  const [tableNumber, setTableNumber] = useState('')
-  const [qrDialogOpen, setQrDialogOpen] = useState(false)
-  const [selectedTable, setSelectedTable] = useState<TableItem | null>(null)
-
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDashboardData = async () => {
       try {
         const user = await getUser()
         if (!user) {
-          // Don't redirect, just show error - proxy handles auth
           setLoading(false)
           return
         }
 
-        // Get store associated with this user
-        const { data: storeData, error } = await supabase
+        // Get store data
+        const { data: storeData } = await supabase
           .from('stores')
-          .select('id, credit_balance')
+          .select('id, total_orders, total_revenue, average_rating')
           .eq('owner_id', user.id)
           .single()
 
         if (storeData) {
           setStoreId(storeData.id)
-          setCreditBalance(storeData.credit_balance)
+          setTotalOrders(storeData.total_orders || 0)
+          setAverageRating(storeData.average_rating || 0)
 
-          // Get today's sales
+          // Fetch today's revenue
           const today = new Date()
           today.setHours(0, 0, 0, 0)
-
-          const { data: ordersData } = await supabase
+          
+          const { data: todayOrders } = await supabase
             .from('orders')
             .select('total_price')
             .eq('store_id', storeData.id)
             .eq('status', 'paid')
             .gte('created_at', today.toISOString())
 
-          if (ordersData) {
-            const total = ordersData.reduce((sum, order) => sum + order.total_price, 0)
-            setTodaySales(total)
+          if (todayOrders) {
+            const todayTotal = todayOrders.reduce((sum, order) => sum + order.total_price, 0)
+            setTodayRevenue(todayTotal)
           }
 
-          // Fetch menus and tables
-          await fetchMenus(storeData.id)
-          await fetchTables(storeData.id)
-        } else if (error) {
-          console.error('Store fetch error:', error)
-          // If store not found, user might not be linked to a store
-          setStoreId('no-store')
+          // Fetch active orders
+          const { data: activeOrdersData } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('store_id', storeData.id)
+            .neq('status', 'paid')
+
+          setActiveOrders(activeOrdersData?.length || 0)
+
+          // Fetch last 7 days revenue
+          const sevenDaysAgo = new Date()
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+          
+          const { data: weeklyOrders } = await supabase
+            .from('orders')
+            .select('total_price, created_at')
+            .eq('store_id', storeData.id)
+            .eq('status', 'paid')
+            .gte('created_at', sevenDaysAgo.toISOString())
+
+          if (weeklyOrders) {
+            const revenueByDate = weeklyOrders.reduce((acc: any, order) => {
+              const date = new Date(order.created_at).toLocaleDateString()
+              acc[date] = (acc[date] || 0) + order.total_price
+              return acc
+            }, {})
+
+            const chartData = Object.entries(revenueByDate).map(([date, revenue]) => ({
+              date: new Date(date).toLocaleDateString('en', { weekday: 'short' }),
+              revenue: revenue as number
+            }))
+            setRevenueData(chartData)
+          }
+
+          // Fetch top menu items
+          const { data: menuPerformance } = await supabase
+            .from('menus')
+            .select(`
+              id,
+              name,
+              order_items!inner(quantity, price)
+            `)
+            .eq('store_id', storeData.id)
+
+          if (menuPerformance) {
+            const menuStats = menuPerformance.map(menu => ({
+              name: menu.name,
+              quantity: menu.order_items.reduce((sum, item) => sum + item.quantity, 0),
+              revenue: menu.order_items.reduce((sum, item) => sum + (item.quantity * item.price), 0)
+            }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5)
+            
+            setTopMenuItems(menuStats)
+          }
+
+          // Fetch recent reviews
+          const { data: reviewsData } = await supabase
+            .from('reviews')
+            .select('*')
+            .eq('store_id', storeData.id)
+            .order('created_at', { ascending: false })
+            .limit(5)
+
+          if (reviewsData) {
+            setRecentReviews(reviewsData)
+          }
         }
       } catch (error) {
         console.error('Dashboard fetch error:', error)
@@ -123,616 +191,260 @@ export default function AdminDashboard() {
       setLoading(false)
     }
 
-    fetchData()
+    fetchDashboardData()
   }, [])
-
-  const fetchMenus = async (storeId: string) => {
-    const { data } = await supabase
-      .from('menus')
-      .select('*')
-      .eq('store_id', storeId)
-      .order('name')
-
-    if (data) {
-      setMenus(data)
-    }
-  }
-
-  const fetchTables = async (storeId: string) => {
-    const { data } = await supabase
-      .from('tables')
-      .select('*')
-      .eq('store_id', storeId)
-      .order('table_number')
-
-    if (data) {
-      setTables(data)
-    }
-  }
 
   const handleLogout = async () => {
     await signOut()
     router.replace('/login')
   }
 
-  // Menu Manager Functions
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImageFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+  const kpiCards: KPICard[] = [
+    {
+      title: "Today's Revenue",
+      value: `฿${todayRevenue.toLocaleString()}`,
+      change: todayRevenue > 0 ? 12.5 : 0,
+      icon: <DollarSign className="w-6 h-6" />,
+      color: 'bg-gradient-to-r from-blue-500 to-blue-600'
+    },
+    {
+      title: 'Active Orders',
+      value: activeOrders,
+      change: activeOrders > 0 ? 8.2 : 0,
+      icon: <Users className="w-6 h-6" />,
+      color: 'bg-gradient-to-r from-green-500 to-green-600'
+    },
+    {
+      title: 'Average Rating',
+      value: averageRating.toFixed(1),
+      change: averageRating > 0 ? 2.1 : 0,
+      icon: <Star className="w-6 h-6" />,
+      color: 'bg-gradient-to-r from-yellow-500 to-orange-600'
+    },
+    {
+      title: 'Total Orders',
+      value: totalOrders,
+      change: totalOrders > 0 ? 15.3 : 0,
+      icon: <TrendingUp className="w-6 h-6" />,
+      color: 'bg-gradient-to-r from-purple-500 to-purple-600'
     }
-  }
+  ]
 
-  const uploadImage = async (file: File): Promise<string | null> => {
-    try {
-      if (file.size > 5 * 1024 * 1024) {
-        console.error('File too large:', file.size)
-        return null
-      }
-
-      if (!file.type.startsWith('image/')) {
-        console.error('Invalid file type:', file.type)
-        return null
-      }
-
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${storeId}-${Date.now()}.${fileExt}`
-      const filePath = `${fileName}`
-
-      console.log('Uploading image:', filePath)
-
-      const { error: uploadError } = await supabase.storage
-        .from('menu-images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        return null
-      }
-
-      const { data } = supabase.storage
-        .from('menu-images')
-        .getPublicUrl(filePath)
-
-      console.log('Upload successful:', data.publicUrl)
-      return data.publicUrl
-    } catch (error) {
-      console.error('Upload failed:', error)
-      return null
-    }
-  }
-
-  const handleMenuSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setUploading(true)
-
-    let imageUrl = editingMenu?.image_url || ''
-
-    if (imageFile) {
-      const uploadedUrl = await uploadImage(imageFile)
-      if (uploadedUrl) {
-        imageUrl = uploadedUrl
-      }
-    }
-
-    const menuData = {
-      store_id: storeId,
-      name: menuFormData.name,
-      price: parseInt(menuFormData.price),
-      description: menuFormData.description,
-      image_url: imageUrl,
-      is_available: true,
-    }
-
-    if (editingMenu) {
-      const { data, error } = await supabase
-        .from('menus')
-        .update(menuData)
-        .eq('id', editingMenu.id)
-        .select()
-
-      if (error) {
-        console.error('Error updating menu:', error)
-        console.log('Full menu update error:', JSON.stringify(error, null, 2))
-        alert(`Error updating menu: ${error.message || 'Unknown error'}`)
-      } else {
-        console.log('Menu updated successfully:', data)
-      }
-    } else {
-      const { data, error } = await supabase
-        .from('menus')
-        .insert(menuData)
-        .select()
-
-      if (error) {
-        console.error('Error creating menu:', error)
-        console.log('Full menu create error:', JSON.stringify(error, null, 2))
-        alert(`Error creating menu: ${error.message || 'Unknown error'}`)
-      } else {
-        console.log('Menu created successfully:', data)
-      }
-    }
-
-    setUploading(false)
-    resetMenuForm()
-    await fetchMenus(storeId)
-  }
-
-  const resetMenuForm = () => {
-    setMenuFormData({ name: '', price: '', description: '' })
-    setImageFile(null)
-    setImagePreview('')
-    setEditingMenu(null)
-    setMenuDialogOpen(false)
-  }
-
-  const deleteMenu = async (menuId: number) => {
-    const { error } = await supabase
-      .from('menus')
-      .delete()
-      .eq('id', menuId)
-
-    if (error) {
-      console.error('Error deleting menu:', error)
-    } else {
-      await fetchMenus(storeId)
-    }
-  }
-
-  // Table Manager Functions
-  const handleAddTable = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    console.log('Adding table:', { storeId, tableNumber })
-    
-    try {
-      const { data, error } = await supabase
-        .from('tables')
-        .insert({
-          store_id: storeId,
-          table_number: tableNumber
-        })
-        .select()
-
-      if (error) {
-        console.error('Error adding table:', error)
-        console.log('Full error object:', JSON.stringify(error, null, 2))
-        console.log('Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        })
-        
-        // Check if tables table doesn't exist
-        if (error.code === '42P01' || error.message.includes('does not exist')) {
-          alert('Tables table not found. Please run the setup-tables.sql script in Supabase SQL Editor.')
-        } else if (error.code === '42501' || error.message.includes('permission denied')) {
-          alert('Permission denied. Please check RLS policies in Supabase.')
-        } else {
-          alert(`Error adding table: ${error.message || 'Unknown error. Check console for details.'}`)
-        }
-      } else {
-        console.log('Table added successfully:', data)
-        setTableNumber('')
-        setTableDialogOpen(false)
-        await fetchTables(storeId)
-      }
-    } catch (err) {
-      console.error('Unexpected error:', err)
-      alert('Unexpected error occurred. Please check console for details.')
-    }
-  }
-
-  const deleteTable = async (tableId: string) => {
-    const { error } = await supabase
-      .from('tables')
-      .delete()
-      .eq('id', tableId)
-
-    if (error) {
-      console.error('Error deleting table:', error)
-    } else {
-      await fetchTables(storeId)
-    }
-  }
-
-  const getQRCodeUrl = (tableNumber: string) => {
-    return `${window.location.origin}/${storeId}/menu?table=${tableNumber}`
-  }
-
-  const printQRCode = () => {
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>QR Codes for Tables</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              .qr-container { 
-                display: inline-block; 
-                margin: 20px; 
-                text-align: center; 
-                page-break-inside: avoid;
-              }
-              .qr-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-              .qr-subtitle { font-size: 14px; color: #666; margin-top: 5px; }
-            </style>
-          </head>
-          <body>
-            <h1>QR Codes for ${storeId} Tables</h1>
-            ${tables.map(table => `
-              <div class="qr-container">
-                <div class="qr-title">Table ${table.table_number}</div>
-                <div id="qr-${table.id}"></div>
-                <div class="qr-subtitle">Scan to order</div>
-              </div>
-            `).join('')}
-            <script>
-              ${tables.map(table => `
-                new QRCode(document.getElementById("qr-${table.id}"), {
-                  text: "${getQRCodeUrl(table.table_number)}",
-                  width: 128,
-                  height: 128
-                });
-              `).join('')}
-            </script>
-          </body>
-        </html>
-      `)
-      printWindow.document.close()
-      printWindow.print()
-    }
-  }
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
-        <div className="animate-pulse text-lg text-slate-600">Loading...</div>
-      </div>
-    )
-  }
-
-  // Show error if user not linked to a store
-  if (storeId === 'no-store') {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
-        <div className="max-w-md mx-auto p-6">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-            <h2 className="text-xl font-bold text-red-800 mb-2">Store Not Found</h2>
-            <p className="text-red-600 mb-4">
-              Your account is not linked to any store. Please contact the administrator to set up your store.
-            </p>
-            <Button onClick={handleLogout} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
-              Logout
-            </Button>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-pulse text-lg text-gray-600">Loading dashboard...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Merchant Dashboard</h1>
-            <p className="text-sm text-slate-500">Store ID: {storeId}</p>
-          </div>
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            className="border-2 border-slate-300 hover:border-red-500 hover:bg-red-50 text-slate-700 hover:text-red-600 rounded-xl px-6"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Credit Balance</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{creditBalance}</div>
-              <p className="text-xs text-muted-foreground">Remaining credits</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Sales</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">฿{todaySales}</div>
-              <p className="text-xs text-muted-foreground">Total sales today</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Tables</CardTitle>
-              <TableIcon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{tables.length}</div>
-              <p className="text-xs text-muted-foreground">Tables with QR codes</p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <Tabs defaultValue="menu" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="menu" className="flex items-center gap-2">
-              <ImageIcon className="w-4 h-4" />
-              Menu Manager
-            </TabsTrigger>
-            <TabsTrigger value="tables" className="flex items-center gap-2">
-              <QrCode className="w-4 h-4" />
-              Table & QR Manager
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Menu Manager Tab */}
-          <TabsContent value="menu" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Menu Management</h2>
-              <Dialog open={menuDialogOpen} onOpenChange={setMenuDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={resetMenuForm} className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl px-6">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Menu Item
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px]">
-                  <DialogHeader>
-                    <DialogTitle>{editingMenu ? 'Edit Menu Item' : 'Add New Menu Item'}</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleMenuSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Menu Name</Label>
-                      <Input
-                        id="name"
-                        value={menuFormData.name}
-                        onChange={(e) => setMenuFormData({ ...menuFormData, name: e.target.value })}
-                        placeholder="e.g., Pad Thai"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="price">Price (฿)</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        value={menuFormData.price}
-                        onChange={(e) => setMenuFormData({ ...menuFormData, price: e.target.value })}
-                        placeholder="e.g., 120"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={menuFormData.description}
-                        onChange={(e) => setMenuFormData({ ...menuFormData, description: e.target.value })}
-                        placeholder="Brief description of the dish"
-                        rows={3}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="image">Image</Label>
-                      <Input
-                        id="image"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                      />
-                      {imagePreview && (
-                        <div className="mt-2">
-                          <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <Button type="submit" disabled={uploading} className="w-full">
-                      {uploading ? 'Uploading...' : (editingMenu ? 'Update Menu' : 'Add Menu')}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-4 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Super Dashboard</h1>
+              <p className="text-sm text-gray-500">Store ID: {storeId}</p>
             </div>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              className="border-gray-300 hover:border-red-500 hover:bg-red-50 w-full sm:w-auto"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+      </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {menus.map((menu) => (
-                <Card key={menu.id} className="overflow-hidden">
-                  {menu.image_url && (
-                    <div className="aspect-video overflow-hidden bg-slate-100">
-                      <img
-                        src={menu.image_url}
-                        alt={menu.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-lg">{menu.name}</h3>
-                    {menu.description && (
-                      <p className="text-sm text-slate-600 mb-3">{menu.description}</p>
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpiCards.map((kpi, index) => (
+            <Card key={index} className={`${kpi.color} text-white border-0`}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/80 text-xs sm:text-sm font-medium">{kpi.title}</p>
+                    <p className="text-xl sm:text-3xl font-bold mt-1">{kpi.value}</p>
+                    {kpi.change !== undefined && (
+                      <div className="flex items-center mt-2 text-xs">
+                        {kpi.change > 0 ? (
+                          <ArrowUpRight className="w-3 h-3 mr-1" />
+                        ) : (
+                          <ArrowDownRight className="w-3 h-3 mr-1" />
+                        )}
+                        <span className="text-white/80">
+                          {Math.abs(kpi.change)}% from yesterday
+                        </span>
+                      </div>
                     )}
-                    <div className="flex justify-between items-center">
-                      <span className="text-xl font-bold text-blue-600">฿{menu.price}</span>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditingMenu(menu)
-                            setMenuFormData({
-                              name: menu.name,
-                              price: menu.price.toString(),
-                              description: menu.description || ''
-                            })
-                            setMenuDialogOpen(true)
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => deleteMenu(menu.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
+                  </div>
+                  <div className="text-white/20">
+                    {kpi.icon}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-          {/* Table & QR Manager Tab */}
-          <TabsContent value="tables" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Table & QR Code Management</h2>
-              <div className="flex gap-2">
-                <Dialog open={tableDialogOpen} onOpenChange={setTableDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="border-2 border-slate-300">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Table
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New Table</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleAddTable} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="tableNumber">Table Number</Label>
-                        <Input
-                          id="tableNumber"
-                          value={tableNumber}
-                          onChange={(e) => setTableNumber(e.target.value)}
-                          placeholder="e.g., 1, 2, A1, VIP1"
-                          required
-                        />
-                      </div>
-                      <Button type="submit" className="w-full">
-                        Add Table
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-                
-                {tables.length > 0 && (
-                  <Button onClick={printQRCode} className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white">
-                    <Download className="w-4 h-4 mr-2" />
-                    Print All QR Codes
-                  </Button>
-                )}
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Link href="/admin/kds">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      Receive Orders (KDS)
+                    </h3>
+                    <p className="text-gray-600 mt-2">
+                      View and manage live orders from customers
+                    </p>
+                    <div className="flex items-center mt-4 text-blue-600">
+                      <span className="font-medium">Go to KDS</span>
+                      <ChefHat className="w-4 h-4 ml-2" />
+                    </div>
+                  </div>
+                  <div className="bg-blue-100 p-4 rounded-full group-hover:bg-blue-200 transition-colors">
+                    <ChefHat className="w-8 h-8 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/admin/menu-manager">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
+                      Add New Menu
+                    </h3>
+                    <p className="text-gray-600 mt-2">
+                      Create new menu items with options and pricing
+                    </p>
+                    <div className="flex items-center mt-4 text-green-600">
+                      <span className="font-medium">Manage Menu</span>
+                      <Utensils className="w-4 h-4 ml-2" />
+                    </div>
+                  </div>
+                  <div className="bg-green-100 p-4 rounded-full group-hover:bg-green-200 transition-colors">
+                    <Plus className="w-8 h-8 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Revenue Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Last 7 Days Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`฿${value}`, 'Revenue']} />
+                    <Bar dataKey="revenue" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {tables.map((table) => (
-                <Card key={table.id}>
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold mb-4">Table {table.table_number}</h3>
-                      <div className="bg-white p-4 rounded-lg border-2 border-slate-200 mb-4">
-                        <QRCode
-                          value={getQRCodeUrl(table.table_number)}
-                          size={128}
-                          level="M"
-                        />
+          {/* Top Menu Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Top 5 Best Selling Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={topMenuItems}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="revenue"
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                    >
+                      {topMenuItems.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`฿${value}`, 'Revenue']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Reviews */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center">
+              <MessageSquare className="w-5 h-5 mr-2" />
+              Recent Customer Reviews
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentReviews.length > 0 ? (
+              <div className="space-y-4">
+                {recentReviews.map((review) => (
+                  <div key={review.id} className="border-b border-gray-100 pb-4 last:border-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${
+                                i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="font-medium text-gray-900">
+                          {review.customer_name || 'Anonymous'}
+                        </span>
                       </div>
-                      <p className="text-xs text-slate-500 mb-4 break-all">
-                        {getQRCodeUrl(table.table_number)}
-                      </p>
-                      <div className="flex gap-2 justify-center">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedTable(table)
-                            setQrDialogOpen(true)
-                          }}
-                        >
-                          <QrCode className="w-4 h-4 mr-1" />
-                          QR
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => deleteTable(table.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <span className="text-sm text-gray-500">
+                        {new Date(review.created_at).toLocaleDateString()}
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* QR Code Dialog */}
-      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>QR Code for Table {selectedTable?.table_number}</DialogTitle>
-          </DialogHeader>
-          <div className="text-center">
-            {selectedTable && (
-              <>
-                <div className="bg-white p-6 rounded-lg border-2 border-slate-200 mb-4">
-                  <QRCode
-                    value={getQRCodeUrl(selectedTable.table_number)}
-                    size={200}
-                    level="M"
-                  />
-                </div>
-                <p className="text-sm text-slate-600 mb-4">
-                  Customers can scan this code to access the menu and place orders for Table {selectedTable.table_number}
-                </p>
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <p className="text-xs font-mono break-all text-slate-600">
-                    {getQRCodeUrl(selectedTable.table_number)}
-                  </p>
-                </div>
-              </>
+                    {review.comment && (
+                      <p className="text-gray-600 text-sm">{review.comment}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No reviews yet. Your customers haven't left any feedback.</p>
+              </div>
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

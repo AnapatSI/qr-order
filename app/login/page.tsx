@@ -24,9 +24,9 @@ export default function LoginPage() {
       console.log('🔍 Starting login process...')
       console.log('📧 Email:', email)
 
-      const { data, error: signInError } = await signIn(email, password)
+      const { user, error: signInError } = await signIn(email, password)
 
-      console.log('📥 Supabase response:', { data, signInError })
+      console.log('📥 Supabase response:', { user, signInError })
 
       if (signInError) {
         console.error('❌ Login error:', signInError.message)
@@ -35,11 +35,10 @@ export default function LoginPage() {
         return
       }
 
-      if (data?.user) {
+      if (user) {
         console.log('✅ Login successful!')
-        console.log('👤 User ID:', data.user.id)
-        console.log('📧 User Email:', data.user.email)
-        console.log('🔐 Session exists:', !!data.session)
+        console.log('👤 User ID:', user.id)
+        console.log('📧 User Email:', user.email)
         
         setLoading(false)
         

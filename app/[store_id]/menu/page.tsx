@@ -50,8 +50,32 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
   }
 
   useEffect(() => {
-    fetchMenus()
+    if (storeId) {
+      fetchMenus()
+    }
   }, [storeId])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading menu...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!tableNo) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+          <h1 className="text-xl font-bold text-red-600 mb-4">Table Required</h1>
+          <p className="text-gray-600">Please scan the QR code at your table to access the menu.</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleAddToCart = (menu: MenuItem) => {
     addToCart({
@@ -65,127 +89,129 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
     updateQuantity(menuId, delta)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-pulse text-lg text-slate-600">Loading menu...</div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-32">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+        <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Bangsaen Cafe</h1>
-              <p className="text-sm text-slate-500">Order your favorites</p>
+              <h1 className="text-lg font-bold text-gray-900">Menu</h1>
+              <p className="text-sm text-gray-500">Table {tableNo}</p>
             </div>
-            {tableNo && (
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-2xl shadow-md">
-                <div className="text-xs font-medium opacity-90">Table</div>
-                <div className="text-xl font-bold">{tableNo}</div>
-              </div>
-            )}
+            <Button
+              onClick={() => setCartOpen(true)}
+              className="relative bg-blue-600 hover:bg-blue-700 text-white"
+              size="sm"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {totalItems}
+                </span>
+              )}
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Menu Grid */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Menu Grid - Mobile First */}
+      <div className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {menus.map((menu) => {
             const quantity = getItemQuantity(menu.id)
             return (
-              <div
-                key={menu.id}
-                className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group"
-              >
+              <Card key={menu.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 {menu.image_url && (
-                  <div className="aspect-video overflow-hidden bg-slate-100">
+                  <div className="aspect-video overflow-hidden bg-gray-100">
                     <img
                       src={menu.image_url}
                       alt={menu.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 )}
-                <div className="p-5">
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">{menu.name}</h3>
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="text-3xl font-bold text-blue-600">
-                      ฿{menu.price}
-                    </div>
-                    
-                    {quantity === 0 ? (
-                      <Button
-                        onClick={() => handleAddToCart(menu)}
-                        size="lg"
-                        className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-2xl px-6 py-3 shadow-md hover:shadow-lg transition-all duration-200 font-semibold"
-                      >
-                        <Plus className="w-5 h-5 mr-2" />
-                        Add
-                      </Button>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">{menu.name}</h3>
+                  
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-lg font-bold text-blue-600">฿{menu.price}</span>
+                    {menu.is_available ? (
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Available</span>
                     ) : (
-                      <div className="flex items-center gap-1 bg-slate-100 rounded-2xl p-1">
-                        <Button
-                          onClick={() => handleUpdateQuantity(menu.id, -1)}
-                          size="sm"
-                          variant="ghost"
-                          className="w-10 h-10 rounded-xl hover:bg-white transition-colors"
-                        >
-                          <Minus className="w-5 h-5" />
-                        </Button>
-                        <div className="w-12 text-center font-bold text-lg">
-                          {quantity}
-                        </div>
-                        <Button
-                          onClick={() => handleUpdateQuantity(menu.id, 1)}
-                          size="sm"
-                          variant="ghost"
-                          className="w-10 h-10 rounded-xl hover:bg-white transition-colors"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </Button>
-                      </div>
+                      <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Sold Out</span>
                     )}
                   </div>
-                </div>
-              </div>
+
+                  {menu.is_available ? (
+                    quantity > 0 ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateQuantity(menu.id, quantity - 1)}
+                            className="w-8 h-8 p-0"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </Button>
+                          <span className="font-semibold w-8 text-center">{quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUpdateQuantity(menu.id, quantity + 1)}
+                            className="w-8 h-8 p-0"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <span className="text-sm text-gray-600">฿{(menu.price * quantity).toLocaleString()}</span>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={() => handleAddToCart(menu)}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add to Cart
+                      </Button>
+                    )
+                  ) : (
+                    <Button disabled className="w-full" size="sm">
+                      Sold Out
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             )
           })}
         </div>
+
+        {menus.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-6xl mb-4">🍽️</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No menu items available</h3>
+            <p className="text-gray-600">Check back later for updated menu items.</p>
+          </div>
+        )}
       </div>
 
-      {/* Sticky Bottom Cart Bar */}
+      {/* Mobile Cart Summary Bar */}
       {totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-2xl">
-          <div className="max-w-6xl mx-auto px-4 py-4">
-            <button
-              onClick={() => setCartOpen(true)}
-              className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-2xl px-6 py-5 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 rounded-full p-2">
-                  <ShoppingCart className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <div className="text-sm font-medium opacity-90">{totalItems} {totalItems === 1 ? 'item' : 'items'}</div>
-                  <div className="text-xs opacity-75">View cart</div>
-                </div>
-              </div>
-              <div className="text-2xl font-bold">
-                ฿{totalPrice}
-              </div>
-            </button>
-          </div>
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-30 md:hidden">
+          <Button
+            onClick={() => setCartOpen(true)}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            size="lg"
+          >
+            <ShoppingCart className="w-5 h-5 mr-2" />
+            View Cart ({totalItems} items) - ฿{totalPrice.toLocaleString()}
+          </Button>
         </div>
       )}
 
+      {/* Cart Drawer */}
       <CartDrawer 
         open={cartOpen} 
         onOpenChange={setCartOpen}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useCartStore } from '@/store/useCartStore'
 import { supabase } from '@/lib/supabase'
+import { validateStoreId, validateTableNumber } from '@/lib/security'
 import { Minus, Plus, X, ShoppingBag, Phone } from 'lucide-react'
 
 interface CartDrawerProps {
@@ -31,6 +32,22 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
       return
     }
 
+    // Validate inputs
+    if (!validateStoreId(storeId)) {
+      alert('Invalid store ID')
+      return
+    }
+
+    if (!validateTableNumber(tableNo)) {
+      alert('Invalid table number')
+      return
+    }
+
+    if (items.length === 0) {
+      alert('Cart is empty')
+      return
+    }
+
     setLoading(true)
     try {
       const { data: orderData, error: orderError } = await supabase
@@ -50,7 +67,7 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
         order_id: orderData.id,
         menu_id: item.id,
         quantity: item.quantity,
-        special_instructions: item.special_instructions
+        price: item.price
       }))
 
       const { error: itemsError } = await supabase
@@ -61,10 +78,11 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
 
       clearCart()
       onOpenChange(false)
-      alert('Order placed successfully!')
+      alert('Order placed successfully! The restaurant will prepare your order.')
+
     } catch (error) {
       console.error('Error placing order:', error)
-      alert('Failed to place order')
+      alert('Failed to place order. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -94,126 +112,119 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:w-[480px] p-0 flex flex-col">
-        {/* Header */}
-        <SheetHeader className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-blue-500 to-cyan-500">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 rounded-full p-2">
-              <ShoppingBag className="w-6 h-6 text-white" />
+      <SheetContent className="w-full sm:w-96 flex flex-col">
+        <SheetHeader className="px-4 pt-4">
+          <SheetTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <ShoppingBag className="w-5 h-5" />
+              <span>Your Cart</span>
             </div>
-            <SheetTitle className="text-2xl font-bold text-white">Your Cart</SheetTitle>
-          </div>
+            <span className="text-sm text-gray-500">
+              {items.length} {items.length === 1 ? 'item' : 'items'}
+            </span>
+          </SheetTitle>
         </SheetHeader>
 
-        {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4">
           {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="bg-slate-100 rounded-full p-6 mb-4">
-                <ShoppingBag className="w-12 h-12 text-slate-400" />
-              </div>
-              <p className="text-slate-500 text-lg">Your cart is empty</p>
-              <p className="text-slate-400 text-sm mt-1">Add some delicious items!</p>
+            <div className="text-center py-8">
+              <div className="text-gray-400 text-5xl mb-4">🛒</div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Your cart is empty</h3>
+              <p className="text-gray-600">Add some delicious items to get started!</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {items.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-slate-900">{item.name}</h3>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-blue-600 font-semibold text-lg">฿{item.price}</span>
-                        <span className="text-slate-400">×</span>
-                        <span className="text-slate-600 font-medium">{item.quantity}</span>
-                      </div>
-                      <div className="text-xl font-bold text-slate-900 mt-2">
-                        ฿{item.price * item.quantity}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 bg-slate-100 rounded-2xl p-1">
-                        <Button
-                          onClick={() => handleUpdateQuantity(item.id, -1)}
-                          size="sm"
-                          variant="ghost"
-                          className="w-8 h-8 rounded-lg hover:bg-white transition-colors"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </Button>
-                        <div className="w-8 text-center font-bold text-sm">
-                          {item.quantity}
-                        </div>
-                        <Button
-                          onClick={() => handleUpdateQuantity(item.id, 1)}
-                          size="sm"
-                          variant="ghost"
-                          className="w-8 h-8 rounded-lg hover:bg-white transition-colors"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
+                <Card key={item.id} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-gray-900">{item.name}</h4>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => removeFromCart(item.id)}
-                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                        className="text-red-500 hover:text-red-700 p-1"
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                       </Button>
                     </div>
-                  </div>
-                </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                          className="w-8 h-8 p-0"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </Button>
+                        <span className="font-semibold w-8 text-center">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                          className="w-8 h-8 p-0"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900">฿{item.price}</div>
+                        <div className="text-sm text-gray-600">฿{(item.price * item.quantity).toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
         </div>
 
-        {/* Footer with Total and Actions */}
-        {items.length > 0 && (
-          <div className="border-t border-slate-200 bg-slate-50 px-6 py-5 space-y-4">
-            {/* Total */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-600 text-lg">Total</span>
-                <span className="text-3xl font-bold text-blue-600">฿{totalPrice}</span>
+        {/* Footer */}
+        <div className="border-t border-gray-200 px-4 py-4 space-y-3">
+          {items.length > 0 && (
+            <>
+              <div className="flex justify-between items-center text-lg font-bold">
+                <span>Total:</span>
+                <span className="text-blue-600">฿{totalPrice.toLocaleString()}</span>
               </div>
-            </div>
+              
+              <div className="space-y-2">
+                <Button
+                  onClick={handlePlaceOrder}
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  size="lg"
+                >
+                  {loading ? 'Placing Order...' : 'Place Order'}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={() => clearCart()}
+                  className="w-full"
+                  size="sm"
+                >
+                  Clear Cart
+                </Button>
+              </div>
+            </>
+          )}
 
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button
-                onClick={handlePlaceOrder}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-2xl py-7 text-xl font-bold shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                    <span>Placing Order...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <ShoppingBag className="w-6 h-6" />
-                    <span>Place Order</span>
-                  </div>
-                )}
-              </Button>
-
-              <Button
-                onClick={handleCallStaff}
-                variant="outline"
-                className="w-full border-2 border-slate-300 hover:border-blue-500 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-2xl py-6 text-lg font-semibold transition-all duration-200"
-              >
-                <Phone className="w-5 h-5 mr-2" />
-                Call Staff / Bill
-              </Button>
-            </div>
+          {/* Call Staff Button */}
+          <div className="pt-2 border-t border-gray-100">
+            <Button
+              variant="outline"
+              className="w-full text-green-600 border-green-600 hover:bg-green-50"
+              size="sm"
+              onClick={handleCallStaff}
+            >
+              <Phone className="w-4 h-4 mr-2" />
+              Call Staff
+            </Button>
           </div>
-        )}
+        </div>
       </SheetContent>
     </Sheet>
   )
