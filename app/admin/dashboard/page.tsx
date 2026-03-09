@@ -94,11 +94,21 @@ export default function AdminDashboard() {
         }
 
         // Get store data
-        const { data: storeData } = await supabase
+        console.log('🏪 Fetching store data for user:', user.id)
+        const { data: storeData, error: storeError } = await supabase
           .from('stores')
           .select('id, total_orders, total_revenue, average_rating')
           .eq('owner_id', user.id)
           .single()
+
+        console.log('📊 Store data result:', { storeData, storeError })
+
+        if (storeError) {
+          console.error('❌ Store fetch error:', storeError)
+          // Don't redirect, just show empty dashboard
+          setLoading(false)
+          return
+        }
 
         if (storeData) {
           setStoreId(storeData.id)
