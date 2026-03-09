@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get current store credit balance
+    // Get current store data
     const { data: storeData, error: storeError } = await supabase
       .from('stores')
-      .select('credit_balance')
+      .select('credit_balance, total_orders, total_revenue')
       .eq('id', store_id)
       .single()
 
@@ -72,21 +72,15 @@ export async function POST(request: NextRequest) {
     const currentBalance = storeData.credit_balance || 0
     const newBalance = Math.max(0, currentBalance - 1)
 
-    console.log('Updating credit balance:', { from: currentBalance, to: newBalance })
-
-    // Update store credit balance
-    const { error: creditError } = await supabase
+    // Update store: credit_balance, total_orders, total_revenue
+    await supabase
       .from('stores')
-      .update({ credit_balance: newBalance })
+      .update({
+        credit_balance: newBalance,
+        total_orders: (storeData as any).total_orders ? (storeData as any).total_orders + 1 : 1,
+        total_revenue: (storeData as any).total_revenue ? Number((storeData as any).total_revenue) + orderData.total_price : orderData.total_price
+      })
       .eq('id', store_id)
-
-    if (creditError) {
-      console.error('Error updating credit balance:', creditError)
-      // Don't return error here - order is already marked as paid
-      // Log the issue but continue
-    }
-
-    console.log('Payment processed successfully:', { order_id, newBalance })
 
     return NextResponse.json({ 
       success: true, 

@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Button } from '@/components/ui/button'
 import { useCartStore } from '@/store/useCartStore'
 import { CartDrawer } from './components/CartDrawer'
-import { ShoppingCart, Plus, Minus, Search, UtensilsCrossed } from 'lucide-react'
+import { MenuOptionDrawer } from './components/MenuOptionDrawer'
+import { ShoppingCart, Plus, Minus, Search, UtensilsCrossed, ClipboardList } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
 
 interface MenuItem {
   id: number
@@ -20,23 +21,36 @@ interface MenuItem {
   description?: string
 }
 
-const CATEGORIES = ['All', 'Recommended', 'Seafood', 'Drinks', 'Desserts']
-
 export default function MenuPage({ params }: { params: Promise<{ store_id: string }> }) {
   const resolvedParams = React.use(params)
   const storeId = resolvedParams.store_id
   const [menus, setMenus] = useState<MenuItem[]>([])
+  const [categories, setCategories] = useState<string[]>(['All'])
   const [loading, setLoading] = useState(true)
   const [cartOpen, setCartOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedMenu, setSelectedMenu] = useState<MenuItem | null>(null)
+  const [optionDrawerOpen, setOptionDrawerOpen] = useState(false)
+  const [storeName, setStoreName] = useState('Smart Order')
   const searchParams = useSearchParams()
   const tableNo = searchParams.get('table')
-  const addToCart = useCartStore((state) => state.addToCart)
-  const updateQuantity = useCartStore((state) => state.updateQuantity)
+  const addToCartSimple = useCartStore((state) => state.addToCartSimple)
   const getItemQuantity = useCartStore((state) => state.getItemQuantity)
   const totalItems = useCartStore((state) => state.items.reduce((sum, item) => sum + item.quantity, 0))
   const totalPrice = useCartStore((state) => state.totalPrice)
+
+  useEffect(() => {
+    if (storeId) {
+      fetchMenus()
+      fetchStoreName()
+    }
+  }, [storeId])
+
+  const fetchStoreName = async () => {
+    const { data } = await supabase.from('stores').select('name').eq('id', storeId).single()
+    if (data) setStoreName(data.name)
+  }
 
   const fetchMenus = async () => {
     const { data, error } = await supabase
@@ -45,25 +59,31 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
       .eq('store_id', storeId)
       .order('name')
 
-    if (error) {
-      console.error('Error fetching menus:', error)
-    } else {
-      setMenus(data || [])
+    if (!error && data) {
+      setMenus(data)
+      // Build dynamic categories from data
+      const cats = [...new Set(data.map(m => m.category).filter(Boolean))] as string[]
+      setCategories(['All', ...cats])
     }
     setLoading(false)
   }
-
-  useEffect(() => {
-    if (storeId) {
-      fetchMenus()
-    }
-  }, [storeId])
 
   const filteredMenus = menus.filter(menu => {
     const matchCategory = activeCategory === 'All' || menu.category === activeCategory
     const matchSearch = menu.name.toLowerCase().includes(searchQuery.toLowerCase())
     return matchCategory && matchSearch
   })
+
+  const handleMenuClick = (menu: MenuItem) => {
+    if (!menu.is_available) return
+    setSelectedMenu(menu)
+    setOptionDrawerOpen(true)
+  }
+
+  const handleQuickAdd = (e: React.MouseEvent, menu: MenuItem) => {
+    e.stopPropagation()
+    addToCartSimple({ id: menu.id, name: menu.name, price: menu.price })
+  }
 
   if (loading) {
     return (
@@ -98,14 +118,6 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
     )
   }
 
-  const handleAddToCart = (menu: MenuItem) => {
-    addToCart({ id: menu.id, name: menu.name, price: menu.price })
-  }
-
-  const handleUpdateQuantity = (menuId: number, delta: number) => {
-    updateQuantity(menuId, delta)
-  }
-
   return (
     <div className="min-h-screen bg-[#f5f5f4] pb-24">
       {/* Header */}
@@ -113,24 +125,32 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Bangsaen Seafood</h1>
+              <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
               <p className="text-xs text-[#0ea5e9] font-medium">Table {tableNo}</p>
             </div>
-            <button
-              onClick={() => setCartOpen(true)}
-              className="relative w-10 h-10 bg-[#0ea5e9] rounded-full flex items-center justify-center shadow-md"
-            >
-              <ShoppingCart className="w-5 h-5 text-white" />
-              {totalItems > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 bg-[#f97316] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center"
-                >
-                  {totalItems}
-                </motion.span>
-              )}
-            </button>
+            <div className="flex items-center space-x-2">
+              <Link
+                href={`/${storeId}/orders?table=${tableNo}`}
+                className="w-10 h-10 bg-[#f5f5f4] rounded-full flex items-center justify-center"
+              >
+                <ClipboardList className="w-5 h-5 text-gray-500" />
+              </Link>
+              <button
+                onClick={() => setCartOpen(true)}
+                className="relative w-10 h-10 bg-[#0ea5e9] rounded-full flex items-center justify-center shadow-md"
+              >
+                <ShoppingCart className="w-5 h-5 text-white" />
+                {totalItems > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 bg-[#f97316] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center"
+                  >
+                    {totalItems}
+                  </motion.span>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -147,7 +167,7 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
 
           {/* Category Pills */}
           <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
@@ -180,7 +200,10 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
                   transition={{ duration: 0.2 }}
                   className="relative"
                 >
-                  <div className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!menu.is_available ? 'opacity-60' : ''}`}>
+                  <div
+                    onClick={() => handleMenuClick(menu)}
+                    className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer ${!menu.is_available ? 'opacity-60' : ''}`}
+                  >
                     {/* Image */}
                     <div className="aspect-square overflow-hidden bg-gray-100 relative">
                       {menu.image_url ? (
@@ -194,9 +217,7 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
                       {/* Sold Out Overlay */}
                       {!menu.is_available && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                            Sold Out
-                          </span>
+                          <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">Sold Out</span>
                         </div>
                       )}
 
@@ -204,7 +225,7 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
                       {menu.is_available && quantity === 0 && (
                         <motion.button
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => handleAddToCart(menu)}
+                          onClick={(e) => handleQuickAdd(e, menu)}
                           className="absolute bottom-2 right-2 w-8 h-8 bg-[#0ea5e9] rounded-full flex items-center justify-center shadow-lg"
                         >
                           <Plus className="w-4 h-4 text-white" />
@@ -216,21 +237,9 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
                         <motion.div
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
-                          className="absolute bottom-2 right-2 flex items-center bg-[#0ea5e9] rounded-full shadow-lg"
+                          className="absolute bottom-2 right-2 bg-[#0ea5e9] text-white text-xs font-bold rounded-full w-7 h-7 flex items-center justify-center shadow-lg"
                         >
-                          <button
-                            onClick={() => handleUpdateQuantity(menu.id, -1)}
-                            className="w-7 h-7 flex items-center justify-center text-white"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="text-white text-xs font-bold min-w-[20px] text-center">{quantity}</span>
-                          <button
-                            onClick={() => handleUpdateQuantity(menu.id, 1)}
-                            className="w-7 h-7 flex items-center justify-center text-white"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
+                          {quantity}
                         </motion.div>
                       )}
                     </div>
@@ -238,6 +247,9 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
                     {/* Info */}
                     <div className="p-3">
                       <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{menu.name}</h3>
+                      {menu.description && (
+                        <p className="text-[10px] text-gray-400 line-clamp-1 mb-1">{menu.description}</p>
+                      )}
                       <p className="text-[#0ea5e9] font-bold text-base">฿{menu.price}</p>
                     </div>
                   </div>
@@ -248,11 +260,7 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
         </div>
 
         {filteredMenus.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-16"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
             <UtensilsCrossed className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-400 text-sm">No menu items found</p>
           </motion.div>
@@ -285,9 +293,16 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
         )}
       </AnimatePresence>
 
+      {/* Add-on Drawer */}
+      <MenuOptionDrawer
+        open={optionDrawerOpen}
+        onOpenChange={setOptionDrawerOpen}
+        menu={selectedMenu}
+      />
+
       {/* Cart Drawer */}
-      <CartDrawer 
-        open={cartOpen} 
+      <CartDrawer
+        open={cartOpen}
         onOpenChange={setCartOpen}
         storeId={storeId}
         tableNo={tableNo}

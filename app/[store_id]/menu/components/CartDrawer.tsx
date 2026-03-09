@@ -2,10 +2,8 @@
 
 import { useState } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
 import { useCartStore } from '@/store/useCartStore'
 import { supabase } from '@/lib/supabase'
-import { validateStoreId, validateTableNumber } from '@/lib/security'
 import { Minus, Plus, Trash2, ShoppingBag, Phone, CheckCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -17,14 +15,12 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerProps) {
-  const { items, removeFromCart, clearCart, updateQuantity } = useCartStore()
+  const { items, removeFromCart, clearCart, updateQuantity, totalPrice } = useCartStore()
   const [loading, setLoading] = useState(false)
   const [orderSuccess, setOrderSuccess] = useState(false)
 
-  const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-
   const handlePlaceOrder = async () => {
-    if (!tableNo || !validateStoreId(storeId) || !validateTableNumber(tableNo) || items.length === 0) return
+    if (!tableNo || items.length === 0) return
 
     setLoading(true)
     try {
@@ -45,7 +41,10 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
         order_id: orderData.id,
         menu_id: item.id,
         quantity: item.quantity,
-        price: item.price
+        selected_options: item.selectedOptions.length > 0
+          ? item.selectedOptions.map(o => `${o.optionName}: ${o.choices.join(', ')}`).join(' | ')
+          : null,
+        note: item.note || null
       }))
 
       const { error: itemsError } = await supabase
@@ -62,7 +61,6 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
       }, 2500)
     } catch (error) {
       console.error('Error placing order:', error)
-      alert('Failed to place order. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -71,14 +69,12 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
   const handleCallStaff = async () => {
     if (!tableNo) return
     try {
-      const { error } = await supabase
+      await supabase
         .from('orders')
         .update({ status: 'served' })
         .eq('store_id', storeId)
         .eq('table_no', tableNo)
         .eq('status', 'pending')
-
-      if (error) throw error
       alert('Staff has been notified!')
     } catch (error) {
       console.error('Error calling staff:', error)
@@ -139,30 +135,47 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
                   <AnimatePresence>
                     {items.map((item) => (
                       <motion.div
-                        key={item.id}
+                        key={item.cartKey}
                         layout
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         className="bg-[#f5f5f4] rounded-xl p-3"
                       >
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-start justify-between mb-1">
                           <h4 className="font-semibold text-gray-900 text-sm flex-1 pr-2">{item.name}</h4>
-                          <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                          <button onClick={() => removeFromCart(item.cartKey)} className="text-gray-400 hover:text-red-500 transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+                        {/* Selected Options */}
+                        {item.selectedOptions.length > 0 && (
+                          <div className="mb-1.5">
+                            {item.selectedOptions.map((opt, i) => (
+                              <p key={i} className="text-[10px] text-gray-500">
+                                {opt.optionName}: <span className="text-gray-700 font-medium">{opt.choices.join(', ')}</span>
+                                {opt.extraPrice > 0 && <span className="text-[#f97316]"> +฿{opt.extraPrice}</span>}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        {/* Note */}
+                        {item.note && (
+                          <p className="text-[10px] text-[#f97316] bg-[#fef3c7] px-2 py-0.5 rounded-md mb-1.5 inline-block">
+                            {item.note}
+                          </p>
+                        )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center bg-white rounded-lg">
-                            <button onClick={() => updateQuantity(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#0ea5e9]">
+                            <button onClick={() => updateQuantity(item.cartKey, -1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#0ea5e9]">
                               <Minus className="w-3.5 h-3.5" />
                             </button>
                             <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
-                            <button onClick={() => updateQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#0ea5e9]">
+                            <button onClick={() => updateQuantity(item.cartKey, 1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#0ea5e9]">
                               <Plus className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <span className="font-bold text-gray-900 text-sm">฿{(item.price * item.quantity).toLocaleString()}</span>
+                          <span className="font-bold text-gray-900 text-sm">฿{((item.price + item.addonsPrice) * item.quantity).toLocaleString()}</span>
                         </div>
                       </motion.div>
                     ))}
@@ -179,20 +192,20 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
                     <span className="text-gray-500 text-sm">Total</span>
                     <span className="text-xl font-bold text-gray-900">฿{totalPrice.toLocaleString()}</span>
                   </div>
-                  <Button
+                  <button
                     onClick={handlePlaceOrder}
                     disabled={loading}
-                    className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white rounded-xl h-12 font-semibold text-base shadow-lg shadow-[#0ea5e9]/20"
+                    className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] disabled:opacity-50 text-white rounded-xl h-12 font-semibold text-base shadow-lg shadow-[#0ea5e9]/20 transition-all"
                   >
                     {loading ? (
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center justify-center space-x-2">
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         <span>Placing order...</span>
                       </div>
                     ) : (
                       'Place Order'
                     )}
-                  </Button>
+                  </button>
                 </>
               )}
               <button

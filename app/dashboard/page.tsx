@@ -16,7 +16,8 @@ import {
   ArrowUpRight,
   QrCode,
   LayoutDashboard,
-  Settings
+  Settings,
+  Table2
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -56,6 +57,7 @@ const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Live Orders', href: '/admin/kds', icon: ChefHat },
   { name: 'Menu', href: '/admin/menu-manager', icon: Utensils },
+  { name: 'Tables', href: '/admin/table-manager', icon: Table2 },
   { name: 'QR Codes', href: '/admin/qr-generator', icon: QrCode },
 ]
 
