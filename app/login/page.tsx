@@ -43,9 +43,9 @@ export default function LoginPage() {
         
         setLoading(false)
         
-        // Simple direct redirect - ไม่ตรวจสองอะไรเลย
-        console.log('🚀 Redirecting to simple dashboard...')
-        window.location.href = '/admin/dashboard-simple'
+        // Simple direct redirect
+        console.log('🚀 Redirecting to dashboard...')
+        window.location.href = '/admin/dashboard'
       } else {
         console.error('❌ No user data returned')
         setError('Login failed. Please try again.')

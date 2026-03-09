@@ -7,8 +7,8 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
-    // ไป dashboard-simple โดยตรงเลย
-    router.replace('/admin/dashboard-simple')
+    // ไป dashboard โดยตรงเลย
+    router.replace('/admin/dashboard')
   }, [router])
 
   return (
