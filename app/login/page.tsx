@@ -43,40 +43,9 @@ export default function LoginPage() {
         
         setLoading(false)
         
-        // Wait for session to be established before redirect
-        console.log('⏳ Waiting for session to propagate...')
-        
-        // Check if session is established before redirecting
-        const checkSession = async () => {
-          try {
-            console.log('🔍 Checking session...')
-            const { data: { session } } = await supabaseAuth.auth.getSession()
-            console.log('📊 Session data:', session)
-            
-            if (session && session.user) {
-              console.log('✅ Session established, redirecting...')
-              console.log('👤 Session user ID:', session.user.id)
-              console.log('🌐 Current pathname:', window.location.pathname)
-              window.location.href = '/admin/dashboard'
-            } else {
-              console.log('❌ Session not ready, retrying...')
-              console.log('Session exists:', !!session)
-              console.log('Session user:', session?.user)
-              setTimeout(checkSession, 500)
-            }
-          } catch (error) {
-            console.error('💥 Session check error:', error)
-            setTimeout(checkSession, 500)
-          }
-        }
-        
-        setTimeout(checkSession, 1000)
-        
-        // Fallback: Force redirect after 5 seconds even if session check fails
-        setTimeout(() => {
-          console.log('⏰ Fallback redirect triggered')
-          window.location.href = '/admin/dashboard'
-        }, 5000)
+        // Simple direct redirect - no session checks needed
+        console.log('� Redirecting to dashboard...')
+        window.location.replace('/admin/dashboard')
       } else {
         console.error('❌ No user data returned')
         setError('Login failed. Please try again.')

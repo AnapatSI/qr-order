@@ -84,6 +84,8 @@ export default function AdminDashboard() {
       try {
         const user = await getUser()
         if (!user) {
+          console.log('No user found, redirecting to login...')
+          router.replace('/login')
           setLoading(false)
           return
         }
