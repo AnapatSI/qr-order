@@ -227,7 +227,7 @@ export default function Dashboard() {
         </nav>
 
         <div className="p-3 border-t border-gray-50">
-          <Link href="/admin/qr-generator" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-all">
+          <Link href="/qr-generator" className="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition-all">
             <Settings className="w-5 h-5 flex-shrink-0" />
             {sidebarOpen && <span className="text-sm">Settings</span>}
           </Link>
@@ -297,7 +297,7 @@ export default function Dashboard() {
                   </CardContent>
                 </Card>
               </Link>
-              <Link href="/admin/menu-manager">
+              <Link href="/menu-manager">
                 <Card className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-white">
                   <CardContent className="p-5 flex items-center space-x-4">
                     <div className="w-12 h-12 bg-[#d1fae5] rounded-xl flex items-center justify-center group-hover:bg-[#10b981] transition-colors">

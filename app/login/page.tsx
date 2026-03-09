@@ -69,13 +69,13 @@ export default function LoginPage() {
               Go to Dashboard
             </a>
             <a
-              href="/admin/dashboard"
+              href="/dashboard"
               className="block w-full bg-gray-500 text-white text-center py-3 rounded-xl font-semibold hover:bg-gray-600"
             >
               Go to Admin Dashboard
             </a>
             <a
-              href="/admin/dashboard-simple"
+              href="/dashboard"
               className="block w-full bg-green-500 text-white text-center py-3 rounded-xl font-semibold hover:bg-green-600"
             >
               Go to Simple Dashboard

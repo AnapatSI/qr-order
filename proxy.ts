@@ -32,8 +32,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Admin routes - auth required
-  if (pathname.startsWith('/admin/')) {
+  // Protected routes - auth required (only KDS needs auth now)
+  if (pathname.startsWith('/admin/') || (pathname.includes('/kds') && !pathname.includes('/menu') && !pathname.includes('/orders'))) {
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
     
     try {
