@@ -44,8 +44,8 @@ export default function LoginPage() {
         setLoading(false)
         
         // Simple direct redirect - no session checks needed
-        console.log('� Redirecting to dashboard...')
-        window.location.replace('/admin/dashboard')
+        console.log('🚀 Redirecting to SIMPLE dashboard...')
+        window.location.replace('/admin/dashboard-simple')
       } else {
         console.error('❌ No user data returned')
         setError('Login failed. Please try again.')
