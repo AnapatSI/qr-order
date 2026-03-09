@@ -33,6 +33,8 @@ export default function LoginPage() {
         setUserName(user.email || '')
         setLoginSuccess(true)
         setLoading(false)
+        // Auto-redirect to dashboard
+        window.location.href = '/dashboard'
       } else {
         setError('Login failed. Please try again.')
         setLoading(false)
