@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { useCartStore } from '@/store/useCartStore'
 import { supabase } from '@/lib/supabase'
 import { validateStoreId, validateTableNumber } from '@/lib/security'
-import { Minus, Plus, X, ShoppingBag, Phone } from 'lucide-react'
+import { Minus, Plus, Trash2, ShoppingBag, Phone, CheckCircle } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface CartDrawerProps {
   open: boolean
@@ -19,34 +19,12 @@ interface CartDrawerProps {
 export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerProps) {
   const { items, removeFromCart, clearCart, updateQuantity } = useCartStore()
   const [loading, setLoading] = useState(false)
+  const [orderSuccess, setOrderSuccess] = useState(false)
 
   const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
-  const handleUpdateQuantity = (menuId: number, delta: number) => {
-    updateQuantity(menuId, delta)
-  }
-
   const handlePlaceOrder = async () => {
-    if (!tableNo) {
-      alert('Table number is required')
-      return
-    }
-
-    // Validate inputs
-    if (!validateStoreId(storeId)) {
-      alert('Invalid store ID')
-      return
-    }
-
-    if (!validateTableNumber(tableNo)) {
-      alert('Invalid table number')
-      return
-    }
-
-    if (items.length === 0) {
-      alert('Cart is empty')
-      return
-    }
+    if (!tableNo || !validateStoreId(storeId) || !validateTableNumber(tableNo) || items.length === 0) return
 
     setLoading(true)
     try {
@@ -77,9 +55,11 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
       if (itemsError) throw itemsError
 
       clearCart()
-      onOpenChange(false)
-      alert('Order placed successfully! The restaurant will prepare your order.')
-
+      setOrderSuccess(true)
+      setTimeout(() => {
+        setOrderSuccess(false)
+        onOpenChange(false)
+      }, 2500)
     } catch (error) {
       console.error('Error placing order:', error)
       alert('Failed to place order. Please try again.')
@@ -89,11 +69,7 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
   }
 
   const handleCallStaff = async () => {
-    if (!tableNo) {
-      alert('Table number is required')
-      return
-    }
-
+    if (!tableNo) return
     try {
       const { error } = await supabase
         .from('orders')
@@ -103,128 +79,132 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
         .eq('status', 'pending')
 
       if (error) throw error
-      alert('Staff notified!')
+      alert('Staff has been notified!')
     } catch (error) {
       console.error('Error calling staff:', error)
-      alert('Failed to notify staff')
     }
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:w-96 flex flex-col">
-        <SheetHeader className="px-4 pt-4">
+      <SheetContent className="w-full sm:w-96 flex flex-col p-0">
+        <SheetHeader className="px-5 pt-5 pb-3 border-b border-gray-100">
           <SheetTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <ShoppingBag className="w-5 h-5" />
-              <span>Your Cart</span>
+              <ShoppingBag className="w-5 h-5 text-[#0ea5e9]" />
+              <span className="text-lg">Your Order</span>
             </div>
-            <span className="text-sm text-gray-500">
-              {items.length} {items.length === 1 ? 'item' : 'items'}
+            <span className="text-xs text-gray-400 font-normal">
+              {items.reduce((sum, i) => sum + i.quantity, 0)} items
             </span>
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          {items.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 text-5xl mb-4">🛒</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Your cart is empty</h3>
-              <p className="text-gray-600">Add some delicious items to get started!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {items.map((item) => (
-                <Card key={item.id} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{item.name}</h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                          className="w-8 h-8 p-0"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </Button>
-                        <span className="font-semibold w-8 text-center">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                          className="w-8 h-8 p-0"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-gray-900">฿{item.price}</div>
-                        <div className="text-sm text-gray-600">฿{(item.price * item.quantity).toLocaleString()}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-gray-200 px-4 py-4 space-y-3">
-          {items.length > 0 && (
-            <>
-              <div className="flex justify-between items-center text-lg font-bold">
-                <span>Total:</span>
-                <span className="text-blue-600">฿{totalPrice.toLocaleString()}</span>
-              </div>
-              
-              <div className="space-y-2">
-                <Button
-                  onClick={handlePlaceOrder}
-                  disabled={loading}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  size="lg"
-                >
-                  {loading ? 'Placing Order...' : 'Place Order'}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={() => clearCart()}
-                  className="w-full"
-                  size="sm"
-                >
-                  Clear Cart
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Call Staff Button */}
-          <div className="pt-2 border-t border-gray-100">
-            <Button
-              variant="outline"
-              className="w-full text-green-600 border-green-600 hover:bg-green-50"
-              size="sm"
-              onClick={handleCallStaff}
+        {/* Order Success */}
+        <AnimatePresence>
+          {orderSuccess && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex-1 flex items-center justify-center"
             >
-              <Phone className="w-4 h-4 mr-2" />
-              Call Staff
-            </Button>
-          </div>
-        </div>
+              <div className="text-center">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', damping: 10, stiffness: 200 }}
+                >
+                  <CheckCircle className="w-20 h-20 text-[#10b981] mx-auto mb-4" />
+                </motion.div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1">Order Placed!</h3>
+                <p className="text-gray-500 text-sm">Your food is being prepared</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!orderSuccess && (
+          <>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {items.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-[#f5f5f4] rounded-full flex items-center justify-center mx-auto mb-4">
+                    <ShoppingBag className="w-8 h-8 text-gray-300" />
+                  </div>
+                  <p className="text-gray-400 text-sm">Your cart is empty</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <AnimatePresence>
+                    {items.map((item) => (
+                      <motion.div
+                        key={item.id}
+                        layout
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        className="bg-[#f5f5f4] rounded-xl p-3"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-semibold text-gray-900 text-sm flex-1 pr-2">{item.name}</h4>
+                          <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center bg-white rounded-lg">
+                            <button onClick={() => updateQuantity(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#0ea5e9]">
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
+                            <button onClick={() => updateQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-[#0ea5e9]">
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <span className="font-bold text-gray-900 text-sm">฿{(item.price * item.quantity).toLocaleString()}</span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-100 px-5 py-4 space-y-3">
+              {items.length > 0 && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">Total</span>
+                    <span className="text-xl font-bold text-gray-900">฿{totalPrice.toLocaleString()}</span>
+                  </div>
+                  <Button
+                    onClick={handlePlaceOrder}
+                    disabled={loading}
+                    className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white rounded-xl h-12 font-semibold text-base shadow-lg shadow-[#0ea5e9]/20"
+                  >
+                    {loading ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Placing order...</span>
+                      </div>
+                    ) : (
+                      'Place Order'
+                    )}
+                  </Button>
+                </>
+              )}
+              <button
+                onClick={handleCallStaff}
+                className="w-full flex items-center justify-center space-x-2 text-[#10b981] text-sm font-medium py-2 hover:bg-[#10b981]/5 rounded-lg transition-colors"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call Staff</span>
+              </button>
+            </div>
+          </>
+        )}
       </SheetContent>
     </Sheet>
   )

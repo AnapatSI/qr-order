@@ -1,8 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
+import { Flame, CheckCircle, CreditCard, Clock } from 'lucide-react'
 
 interface Order {
   id: number
@@ -10,8 +10,11 @@ interface Order {
   status: string
   total_price: number
   created_at: string
+  notes?: string
   order_items: {
     quantity: number
+    notes?: string
+    selected_options?: string
     menus: {
       name: string
     }
@@ -33,7 +36,6 @@ export function OrderCard({ order, onUpdate, storeId }: OrderCardProps) {
 
     if (error) {
       console.error('Error updating order:', error)
-      alert('Failed to update order')
     } else {
       onUpdate()
     }
@@ -43,109 +45,108 @@ export function OrderCard({ order, onUpdate, storeId }: OrderCardProps) {
     try {
       const response = await fetch('/api/orders/pay', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          order_id: order.id,
-          store_id: storeId
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: order.id, store_id: storeId })
       })
-
-      if (response.ok) {
-        onUpdate()
-      } else {
-        alert('Payment processing failed')
-      }
+      if (response.ok) onUpdate()
     } catch (error) {
       console.error('Payment error:', error)
-      alert('Payment processing failed')
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-500'
-      case 'cooking': return 'bg-blue-500'
-      case 'served': return 'bg-green-500'
-      default: return 'bg-gray-500'
-    }
+  const timeSince = () => {
+    const mins = Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000)
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins}m ago`
+    return `${Math.floor(mins / 60)}h ${mins % 60}m ago`
   }
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending': return 'PENDING'
-      case 'cooking': return 'COOKING'
-      case 'served': return 'READY TO SERVE'
-      default: return status.toUpperCase()
-    }
+  const statusConfig: Record<string, { border: string; badge: string; badgeText: string }> = {
+    pending: { border: 'border-l-[#f97316]', badge: 'bg-[#f97316]', badgeText: 'NEW' },
+    cooking: { border: 'border-l-[#0ea5e9]', badge: 'bg-[#0ea5e9]', badgeText: 'COOKING' },
+    served: { border: 'border-l-[#10b981]', badge: 'bg-[#10b981]', badgeText: 'READY' },
   }
+
+  const config = statusConfig[order.status] || statusConfig.pending
 
   return (
-    <Card className="bg-gray-800 border-gray-700 text-white">
-      <CardHeader className="pb-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <div className={`inline-block px-3 py-1 rounded-full text-sm font-bold mb-3 ${getStatusColor(order.status)}`}>
-              {getStatusText(order.status)}
-            </div>
-            <div className="text-6xl font-bold text-center py-4">
-              TABLE {order.table_no}
-            </div>
-            <div className="text-center text-gray-400">
-              Order #{order.id}
-            </div>
+    <div className={`bg-white rounded-2xl border-l-4 ${config.border} shadow-sm overflow-hidden`}>
+      {/* Header */}
+      <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className={`${config.badge} text-white text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider`}>
+              {config.badgeText}
+            </span>
+            <span className="text-xs text-gray-400 flex items-center">
+              <Clock className="w-3 h-3 mr-1" />
+              {timeSince()}
+            </span>
           </div>
+          <h2 className="text-4xl font-black text-gray-900 mt-1">T{order.table_no}</h2>
+          <p className="text-xs text-gray-400">#{order.id}</p>
         </div>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
+        <div className="text-right">
+          <p className="text-2xl font-bold text-gray-900">฿{order.total_price}</p>
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="px-5 pb-3">
         <div className="space-y-2">
           {order.order_items.map((item, index) => (
-            <div key={index} className="flex justify-between text-lg">
-              <span>{item.quantity}x {item.menus.name}</span>
+            <div key={index}>
+              <div className="flex items-baseline justify-between">
+                <span className="text-lg font-semibold text-gray-900">
+                  <span className="text-[#0ea5e9] font-bold mr-1">{item.quantity}x</span>
+                  {item.menus.name}
+                </span>
+              </div>
+              {item.selected_options && (
+                <p className="text-sm bg-[#fef3c7] text-[#92400e] px-2 py-1 rounded-lg mt-1 font-medium">
+                  {item.selected_options}
+                </p>
+              )}
+              {item.notes && (
+                <p className="text-sm bg-[#fef2f2] text-[#dc2626] px-2 py-1 rounded-lg mt-1 font-medium">
+                  Note: {item.notes}
+                </p>
+              )}
             </div>
           ))}
         </div>
+      </div>
 
-        <div className="border-t border-gray-700 pt-4">
-          <div className="text-2xl font-bold text-center mb-4">
-            Total: ฿{order.total_price}
-          </div>
-
-          <div className="space-y-3">
-            {order.status === 'pending' && (
-              <Button
-                onClick={() => updateOrderStatus('cooking')}
-                className="w-full text-xl py-6 bg-blue-600 hover:bg-blue-700"
-                size="lg"
-              >
-                Start Cooking
-              </Button>
-            )}
-
-            {order.status === 'cooking' && (
-              <Button
-                onClick={() => updateOrderStatus('served')}
-                className="w-full text-xl py-6 bg-green-600 hover:bg-green-700"
-                size="lg"
-              >
-                Ready to Serve
-              </Button>
-            )}
-
-            {order.status === 'served' && (
-              <Button
-                onClick={handlePayment}
-                className="w-full text-xl py-6 bg-red-600 hover:bg-red-700"
-                size="lg"
-              >
-                Paid / Close
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      {/* Action Button */}
+      <div className="px-4 pb-4">
+        {order.status === 'pending' && (
+          <button
+            onClick={() => updateOrderStatus('cooking')}
+            className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white rounded-xl py-4 text-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.98] transition-all"
+          >
+            <Flame className="w-5 h-5" />
+            <span>Start Cooking</span>
+          </button>
+        )}
+        {order.status === 'cooking' && (
+          <button
+            onClick={() => updateOrderStatus('served')}
+            className="w-full bg-[#10b981] hover:bg-[#059669] text-white rounded-xl py-4 text-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.98] transition-all"
+          >
+            <CheckCircle className="w-5 h-5" />
+            <span>Serve</span>
+          </button>
+        )}
+        {order.status === 'served' && (
+          <button
+            onClick={handlePayment}
+            className="w-full bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-xl py-4 text-lg font-bold flex items-center justify-center space-x-2 active:scale-[0.98] transition-all"
+          >
+            <CreditCard className="w-5 h-5" />
+            <span>Paid / Close</span>
+          </button>
+        )}
+      </div>
+    </div>
   )
 }

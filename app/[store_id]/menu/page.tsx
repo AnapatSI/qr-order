@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useCartStore } from '@/store/useCartStore'
 import { CartDrawer } from './components/CartDrawer'
-import { ShoppingCart, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Search, UtensilsCrossed } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface MenuItem {
   id: number
@@ -16,15 +16,20 @@ interface MenuItem {
   price: number
   image_url?: string
   is_available: boolean
+  category?: string
+  description?: string
 }
 
+const CATEGORIES = ['All', 'Recommended', 'Seafood', 'Drinks', 'Desserts']
+
 export default function MenuPage({ params }: { params: Promise<{ store_id: string }> }) {
-  // 1. Unwrap at the top level
-  const resolvedParams = React.use(params);
-  const storeId = resolvedParams.store_id;
+  const resolvedParams = React.use(params)
+  const storeId = resolvedParams.store_id
   const [menus, setMenus] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
   const [cartOpen, setCartOpen] = useState(false)
+  const [activeCategory, setActiveCategory] = useState('All')
+  const [searchQuery, setSearchQuery] = useState('')
   const searchParams = useSearchParams()
   const tableNo = searchParams.get('table')
   const addToCart = useCartStore((state) => state.addToCart)
@@ -33,12 +38,11 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
   const totalItems = useCartStore((state) => state.items.reduce((sum, item) => sum + item.quantity, 0))
   const totalPrice = useCartStore((state) => state.totalPrice)
 
-    const fetchMenus = async () => {
+  const fetchMenus = async () => {
     const { data, error } = await supabase
       .from('menus')
       .select('*')
       .eq('store_id', storeId)
-      .eq('is_available', true)
       .order('name')
 
     if (error) {
@@ -55,12 +59,22 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
     }
   }, [storeId])
 
+  const filteredMenus = menus.filter(menu => {
+    const matchCategory = activeCategory === 'All' || menu.category === activeCategory
+    const matchSearch = menu.name.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchCategory && matchSearch
+  })
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#f5f5f4] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading menu...</p>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            className="w-12 h-12 border-3 border-[#0ea5e9] border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-gray-500 text-sm">Loading menu...</p>
         </div>
       </div>
     )
@@ -68,21 +82,24 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
 
   if (!tableNo) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
-          <h1 className="text-xl font-bold text-red-600 mb-4">Table Required</h1>
-          <p className="text-gray-600">Please scan the QR code at your table to access the menu.</p>
-        </div>
+      <div className="min-h-screen bg-[#f5f5f4] flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center"
+        >
+          <div className="w-16 h-16 bg-[#e0f2fe] rounded-full flex items-center justify-center mx-auto mb-4">
+            <UtensilsCrossed className="w-8 h-8 text-[#0ea5e9]" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Scan QR Code</h1>
+          <p className="text-gray-500 text-sm">Please scan the QR code at your table to access the menu.</p>
+        </motion.div>
       </div>
     )
   }
 
   const handleAddToCart = (menu: MenuItem) => {
-    addToCart({
-      id: menu.id,
-      name: menu.name,
-      price: menu.price
-    })
+    addToCart({ id: menu.id, name: menu.name, price: menu.price })
   }
 
   const handleUpdateQuantity = (menuId: number, delta: number) => {
@@ -90,126 +107,183 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Mobile Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-[#f5f5f4] pb-24">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100">
+        <div className="px-4 pt-4 pb-2">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h1 className="text-lg font-bold text-gray-900">Menu</h1>
-              <p className="text-sm text-gray-500">Table {tableNo}</p>
+              <h1 className="text-xl font-bold text-gray-900">Bangsaen Seafood</h1>
+              <p className="text-xs text-[#0ea5e9] font-medium">Table {tableNo}</p>
             </div>
-            <Button
+            <button
               onClick={() => setCartOpen(true)}
-              className="relative bg-blue-600 hover:bg-blue-700 text-white"
-              size="sm"
+              className="relative w-10 h-10 bg-[#0ea5e9] rounded-full flex items-center justify-center shadow-md"
             >
-              <ShoppingCart className="w-4 h-4" />
+              <ShoppingCart className="w-5 h-5 text-white" />
               {totalItems > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1 -right-1 bg-[#f97316] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center"
+                >
                   {totalItems}
-                </span>
+                </motion.span>
               )}
-            </Button>
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search menu..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 bg-[#f5f5f4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0ea5e9]/30 transition-all"
+            />
+          </div>
+
+          {/* Category Pills */}
+          <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                  activeCategory === cat
+                    ? 'bg-[#0ea5e9] text-white shadow-sm'
+                    : 'bg-white text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Menu Grid - Mobile First */}
-      <div className="p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {menus.map((menu) => {
-            const quantity = getItemQuantity(menu.id)
-            return (
-              <Card key={menu.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                {menu.image_url && (
-                  <div className="aspect-video overflow-hidden bg-gray-100">
-                    <img
-                      src={menu.image_url}
-                      alt={menu.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-gray-900 mb-2">{menu.name}</h3>
-                  
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-lg font-bold text-blue-600">฿{menu.price}</span>
-                    {menu.is_available ? (
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Available</span>
-                    ) : (
-                      <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">Sold Out</span>
-                    )}
-                  </div>
-
-                  {menu.is_available ? (
-                    quantity > 0 ? (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdateQuantity(menu.id, quantity - 1)}
-                            className="w-8 h-8 p-0"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </Button>
-                          <span className="font-semibold w-8 text-center">{quantity}</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleUpdateQuantity(menu.id, quantity + 1)}
-                            className="w-8 h-8 p-0"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
+      {/* Menu Grid */}
+      <div className="px-4 pt-4">
+        <div className="grid grid-cols-2 gap-3">
+          <AnimatePresence mode="popLayout">
+            {filteredMenus.map((menu) => {
+              const quantity = getItemQuantity(menu.id)
+              return (
+                <motion.div
+                  key={menu.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative"
+                >
+                  <div className={`bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${!menu.is_available ? 'opacity-60' : ''}`}>
+                    {/* Image */}
+                    <div className="aspect-square overflow-hidden bg-gray-100 relative">
+                      {menu.image_url ? (
+                        <img src={menu.image_url} alt={menu.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#e0f2fe] to-[#f5f5f4]">
+                          <UtensilsCrossed className="w-10 h-10 text-[#0ea5e9]/30" />
                         </div>
-                        <span className="text-sm text-gray-600">฿{(menu.price * quantity).toLocaleString()}</span>
-                      </div>
-                    ) : (
-                      <Button
-                        onClick={() => handleAddToCart(menu)}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                        size="sm"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add to Cart
-                      </Button>
-                    )
-                  ) : (
-                    <Button disabled className="w-full" size="sm">
-                      Sold Out
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
+                      )}
+
+                      {/* Sold Out Overlay */}
+                      {!menu.is_available && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                            Sold Out
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Quick Add Button */}
+                      {menu.is_available && quantity === 0 && (
+                        <motion.button
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => handleAddToCart(menu)}
+                          className="absolute bottom-2 right-2 w-8 h-8 bg-[#0ea5e9] rounded-full flex items-center justify-center shadow-lg"
+                        >
+                          <Plus className="w-4 h-4 text-white" />
+                        </motion.button>
+                      )}
+
+                      {/* Quantity Badge */}
+                      {quantity > 0 && (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="absolute bottom-2 right-2 flex items-center bg-[#0ea5e9] rounded-full shadow-lg"
+                        >
+                          <button
+                            onClick={() => handleUpdateQuantity(menu.id, -1)}
+                            className="w-7 h-7 flex items-center justify-center text-white"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-white text-xs font-bold min-w-[20px] text-center">{quantity}</span>
+                          <button
+                            onClick={() => handleUpdateQuantity(menu.id, 1)}
+                            className="w-7 h-7 flex items-center justify-center text-white"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </motion.div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3">
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">{menu.name}</h3>
+                      <p className="text-[#0ea5e9] font-bold text-base">฿{menu.price}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
         </div>
 
-        {menus.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">🍽️</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No menu items available</h3>
-            <p className="text-gray-600">Check back later for updated menu items.</p>
-          </div>
+        {filteredMenus.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-16"
+          >
+            <UtensilsCrossed className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-400 text-sm">No menu items found</p>
+          </motion.div>
         )}
       </div>
 
-      {/* Mobile Cart Summary Bar */}
-      {totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-30 md:hidden">
-          <Button
-            onClick={() => setCartOpen(true)}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            size="lg"
+      {/* Floating Cart Bar */}
+      <AnimatePresence>
+        {totalItems > 0 && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="fixed bottom-4 left-4 right-4 z-30"
           >
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            View Cart ({totalItems} items) - ฿{totalPrice.toLocaleString()}
-          </Button>
-        </div>
-      )}
+            <button
+              onClick={() => setCartOpen(true)}
+              className="w-full bg-[#0ea5e9] text-white rounded-2xl px-5 py-4 flex items-center justify-between shadow-xl shadow-[#0ea5e9]/25"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                  <ShoppingCart className="w-4 h-4" />
+                </div>
+                <span className="font-semibold text-sm">{totalItems} items</span>
+              </div>
+              <span className="font-bold text-lg">฿{totalPrice.toLocaleString()}</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Cart Drawer */}
       <CartDrawer 
