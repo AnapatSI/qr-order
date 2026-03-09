@@ -8,7 +8,7 @@ export default function FullDiagnostic() {
   const [results, setResults] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const addResult = (test: string, status: 'success' | 'error' | 'warning', details: any) => {
+  const addResult = (test: string, status: 'success' | 'error' | 'warning' | 'loading', details: any) => {
     setResults(prev => [...prev, { test, status, details, timestamp: new Date().toLocaleTimeString() }])
   }
 
