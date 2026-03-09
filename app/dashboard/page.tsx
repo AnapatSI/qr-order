@@ -55,16 +55,16 @@ interface TopMenuItem {
 
 const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Live Orders', href: '/admin/kds', icon: ChefHat },
-  { name: 'Menu', href: '/admin/menu-manager', icon: Utensils },
-  { name: 'Tables', href: '/admin/table-manager', icon: Table2 },
-  { name: 'QR Codes', href: '/admin/qr-generator', icon: QrCode },
+  { name: 'Menu', href: '/menu-manager', icon: Utensils },
+  { name: 'Tables', href: '/table-manager', icon: Table2 },
+  { name: 'QR Codes', href: '/qr-generator', icon: QrCode },
 ]
 
 export default function Dashboard() {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [storeId, setStoreId] = useState('')
   
   const [todayRevenue, setTodayRevenue] = useState(0)
   const [activeOrders, setActiveOrders] = useState(0)
@@ -86,6 +86,7 @@ export default function Dashboard() {
 
         if (!storeData) { setLoading(false); return }
 
+        setStoreId(storeData.id)
         setTotalOrders(storeData.total_orders || 0)
         setAverageRating(storeData.average_rating || 0)
 
@@ -283,7 +284,7 @@ export default function Dashboard() {
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Link href="/admin/kds">
+              <Link href={storeId ? `/${storeId}/kds` : '#'}>
                 <Card className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer group bg-white">
                   <CardContent className="p-5 flex items-center space-x-4">
                     <div className="w-12 h-12 bg-[#e0f2fe] rounded-xl flex items-center justify-center group-hover:bg-[#0ea5e9] transition-colors">
