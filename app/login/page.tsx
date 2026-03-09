@@ -1,9 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { signIn } from '@/lib/supabase-auth-simple'
-import { supabaseAuth } from '@/lib/supabase-auth-simple'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +12,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
+  const [loginSuccess, setLoginSuccess] = useState(false)
+  const [userName, setUserName] = useState('')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,40 +21,67 @@ export default function LoginPage() {
     setError('')
 
     try {
-      console.log('🔍 Starting login process...')
-      console.log('📧 Email:', email)
-
       const { user, error: signInError } = await signIn(email, password)
 
-      console.log('📥 Supabase response:', { user, signInError })
-
       if (signInError) {
-        console.error('❌ Login error:', signInError.message)
         setError(signInError.message)
         setLoading(false)
         return
       }
 
       if (user) {
-        console.log('✅ Login successful!')
-        console.log('👤 User ID:', user.id)
-        console.log('📧 User Email:', user.email)
-        
+        setUserName(user.email || '')
+        setLoginSuccess(true)
         setLoading(false)
-        
-        // Simple direct redirect
-        console.log('🚀 Redirecting to dashboard...')
-        window.location.href = '/dashboard'
       } else {
-        console.error('❌ No user data returned')
         setError('Login failed. Please try again.')
         setLoading(false)
       }
     } catch (err) {
-      console.error('💥 Unexpected error:', err)
       setError('Something went wrong. Please try again.')
       setLoading(false)
     }
+  }
+
+  // Login success - show dashboard links
+  if (loginSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-2xl border-0">
+          <CardHeader className="space-y-3 text-center pb-8">
+            <div className="mx-auto w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <CardTitle className="text-3xl font-bold">Login Successful!</CardTitle>
+            <CardDescription className="text-base">
+              Welcome, {userName}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <a
+              href="/dashboard"
+              className="block w-full bg-blue-500 text-white text-center py-3 rounded-xl font-semibold hover:bg-blue-600"
+            >
+              Go to Dashboard
+            </a>
+            <a
+              href="/admin/dashboard"
+              className="block w-full bg-gray-500 text-white text-center py-3 rounded-xl font-semibold hover:bg-gray-600"
+            >
+              Go to Admin Dashboard
+            </a>
+            <a
+              href="/admin/dashboard-simple"
+              className="block w-full bg-green-500 text-white text-center py-3 rounded-xl font-semibold hover:bg-green-600"
+            >
+              Go to Simple Dashboard
+            </a>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
