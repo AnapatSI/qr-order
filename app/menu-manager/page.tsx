@@ -111,35 +111,46 @@ export default function MenuManager() {
     } catch { return null }
   }
 
-  const toggleAvailability = async (menu: MenuItem) => {
-    await supabase.from('menus').update({ is_available: !menu.is_available }).eq('id', menu.id)
-    await fetchMenus(storeId)
-  }
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setUploading(true)
-    let imageUrl = editingMenu?.image_url || ''
-    if (imageFile) {
-      const url = await uploadImage(imageFile)
-      if (url) imageUrl = url
+    try {
+      let imageUrl = editingMenu?.image_url || ''
+      if (imageFile) {
+        const url = await uploadImage(imageFile)
+        if (url) imageUrl = url
+      }
+      const menuData = {
+        store_id: storeId,
+        name: formData.name,
+        price: parseInt(formData.price),
+        image_url: imageUrl,
+        is_available: true,
+        category: formData.category || null,
+        description: formData.description || null
+      }
+      
+      let error
+      if (editingMenu) {
+        const { error: updateError } = await supabase.from('menus').update(menuData).eq('id', editingMenu.id)
+        error = updateError
+      } else {
+        const { error: insertError } = await supabase.from('menus').insert(menuData)
+        error = insertError
+      }
+      
+      if (error) {
+        console.error('Error saving menu:', error)
+        alert('Failed to save menu item')
+      } else {
+        await fetchMenus(storeId)
+        resetForm()
+      }
+    } catch (error) {
+      console.error('Error in handleSubmit:', error)
+      alert('Failed to save menu item')
     }
-    const menuData = {
-      store_id: storeId,
-      name: formData.name,
-      price: parseInt(formData.price),
-      image_url: imageUrl,
-      is_available: true,
-      category: formData.category || null,
-      description: formData.description || null
-    }
-    if (editingMenu) {
-      await supabase.from('menus').update(menuData).eq('id', editingMenu.id)
-    } else {
-      await supabase.from('menus').insert(menuData)
-    }
-    await fetchMenus(storeId)
-    resetForm()
     setUploading(false)
   }
 
@@ -152,15 +163,34 @@ export default function MenuManager() {
 
   const handleDelete = async (id: number) => {
     if (confirm('Delete this menu item and all its options?')) {
-      await supabase.from('menu_options').delete().eq('menu_id', id)
-      await supabase.from('menus').delete().eq('id', id)
-      await fetchMenus(storeId)
+      try {
+        const { error: optionsError } = await supabase.from('menu_options').delete().eq('menu_id', id)
+        if (optionsError) {
+          console.error('Error deleting menu options:', optionsError)
+        }
+        
+        const { error: menuError } = await supabase.from('menus').delete().eq('id', id)
+        if (menuError) {
+          console.error('Error deleting menu:', menuError)
+          alert('Failed to delete menu item')
+        } else {
+          await fetchMenus(storeId)
+        }
+      } catch (error) {
+        console.error('Error in handleDelete:', error)
+        alert('Failed to delete menu item')
+      }
     }
   }
 
   const toggleAvailable = async (id: number, currentStatus: boolean) => {
-    await supabase.from('menus').update({ is_available: !currentStatus }).eq('id', id)
-    await fetchMenus(storeId)
+    const { error } = await supabase.from('menus').update({ is_available: !currentStatus }).eq('id', id)
+    if (error) {
+      console.error('Error toggling menu availability:', error)
+      alert('Failed to update menu availability')
+    } else {
+      await fetchMenus(storeId)
+    }
   }
 
   const resetForm = () => {
