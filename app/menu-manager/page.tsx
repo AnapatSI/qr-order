@@ -116,11 +116,21 @@ export default function MenuManager() {
     e.preventDefault()
     setUploading(true)
     try {
+      console.log('Store ID:', storeId)
+      console.log('Form data:', formData)
+      
+      if (!storeId) {
+        alert('Store ID is required')
+        setUploading(false)
+        return
+      }
+      
       let imageUrl = editingMenu?.image_url || ''
       if (imageFile) {
         const url = await uploadImage(imageFile)
         if (url) imageUrl = url
       }
+      
       const menuData = {
         store_id: storeId,
         name: formData.name,
@@ -131,25 +141,30 @@ export default function MenuManager() {
         description: formData.description || null
       }
       
+      console.log('Menu data to save:', menuData)
+      
       let error
       if (editingMenu) {
+        console.log('Updating menu:', editingMenu.id)
         const { error: updateError } = await supabase.from('menus').update(menuData).eq('id', editingMenu.id)
         error = updateError
       } else {
+        console.log('Inserting new menu')
         const { error: insertError } = await supabase.from('menus').insert(menuData)
         error = insertError
       }
       
       if (error) {
         console.error('Error saving menu:', error)
-        alert('Failed to save menu item')
+        alert(`Failed to save menu item: ${error.message}`)
       } else {
+        console.log('Menu saved successfully')
         await fetchMenus(storeId)
         resetForm()
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error)
-      alert('Failed to save menu item')
+      alert(`Failed to save menu item: ${error.message}`)
     }
     setUploading(false)
   }
