@@ -276,7 +276,7 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
                   </div>
                 </motion.div>
               )
-            })})}
+            })}
           </AnimatePresence>
         </div>
 
