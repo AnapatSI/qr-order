@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { useCartStore } from '@/store/useCartStore'
 import { CartDrawer } from './components/CartDrawer'
 import { MenuOptionDrawer } from './components/MenuOptionDrawer'
-import { ShoppingCart, Plus, Minus, Search, UtensilsCrossed, ClipboardList } from 'lucide-react'
+import { ShoppingCart, Plus, Search, UtensilsCrossed, ClipboardList } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 
@@ -176,7 +176,7 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
           </div>
 
           {/* Search */}
-          <div className="relative mb-3">
+          <div className="relative mb-3 mt-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -203,10 +203,11 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
               </button>
             ))}
           </div>
-      </div>
+        </div>
+      </div> {/* <-- ปิดแท็ก Header อย่างถูกต้องแล้วที่นี่ --> */}
 
       {/* Menu Grid */}
-      <div className="px-4 pt-4">
+      <div className="px-4 pt-4 pb-24"> {/* เพิ่ม pb-24 เพื่อไม่ให้ตะกร้าบังเมนูด้านล่างสุด */}
         <div className="grid grid-cols-2 gap-3">
           <AnimatePresence mode="popLayout">
             {filteredMenus.map((menu) => {
