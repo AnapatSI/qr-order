@@ -13,10 +13,19 @@ export default function QRGeneratorPage() {
 
   useEffect(() => {
     const fetchStore = async () => {
-      const { data } = await supabase.from('stores').select('id').limit(1).single()
-      if (data) {
-        setStoreId(data.id)
+      // Get store_id from URL parameter
+      const storeParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('store') : null
+      
+      if (storeParam) {
+        setStoreId(storeParam)
         setGenerated(true)
+      } else {
+        // Fallback: get first store
+        const { data } = await supabase.from('stores').select('id').limit(1).single()
+        if (data) {
+          setStoreId(data.id)
+          setGenerated(true)
+        }
       }
     }
     fetchStore()

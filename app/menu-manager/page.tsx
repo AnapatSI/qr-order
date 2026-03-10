@@ -55,10 +55,19 @@ export default function MenuManager() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: storeData } = await supabase.from('stores').select('id').limit(1).single()
-      if (storeData) {
-        setStoreId(storeData.id)
-        await fetchMenus(storeData.id)
+      // Get store_id from URL parameter
+      const storeParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('store') : null
+      
+      if (storeParam) {
+        setStoreId(storeParam)
+        await fetchMenus(storeParam)
+      } else {
+        // Fallback: get first store
+        const { data: storeData } = await supabase.from('stores').select('id').limit(1).single()
+        if (storeData) {
+          setStoreId(storeData.id)
+          await fetchMenus(storeData.id)
+        }
       }
       setLoading(false)
     }

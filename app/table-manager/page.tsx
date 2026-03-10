@@ -25,10 +25,19 @@ export default function TableManager() {
 
   useEffect(() => {
     const init = async () => {
-      const { data } = await supabase.from('stores').select('id').limit(1).single()
-      if (data) {
-        setStoreId(data.id)
-        await fetchTables(data.id)
+      // Get store_id from URL parameter
+      const storeParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('store') : null
+      
+      if (storeParam) {
+        setStoreId(storeParam)
+        await fetchTables(storeParam)
+      } else {
+        // Fallback: get first store
+        const { data } = await supabase.from('stores').select('id').limit(1).single()
+        if (data) {
+          setStoreId(data.id)
+          await fetchTables(data.id)
+        }
       }
       setLoading(false)
     }
