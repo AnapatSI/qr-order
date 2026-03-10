@@ -158,6 +158,11 @@ export default function MenuManager() {
     }
   }
 
+  const toggleAvailable = async (id: number, currentStatus: boolean) => {
+    await supabase.from('menus').update({ is_available: !currentStatus }).eq('id', id)
+    await fetchMenus(storeId)
+  }
+
   const resetForm = () => {
     setFormData({ name: '', price: '', category: '', description: '' })
     setImageFile(null)
@@ -340,7 +345,7 @@ export default function MenuManager() {
 
                   {/* Toggle */}
                   <button
-                    onClick={() => toggleAvailability(menu)}
+                    onClick={() => toggleAvailable(menu.id, menu.is_available)}
                     className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${menu.is_available ? 'bg-[#10b981]' : 'bg-gray-300'}`}
                   >
                     <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${menu.is_available ? 'left-[22px]' : 'left-0.5'}`} />

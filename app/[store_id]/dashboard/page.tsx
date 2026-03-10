@@ -58,7 +58,7 @@ const NAV_ITEMS = [
   { name: 'Live Orders', href: '/kds', icon: ChefHat },
   { name: 'Menu', href: '/menu-manager', icon: Utensils },
   { name: 'Tables', href: '/table-manager', icon: Settings },
-  { name: 'QR Codes', href: '/qr-generator', icon: QrCode },
+  // { name: 'QR Codes', href: '/qr-generator', icon: QrCode },
 ]
 
 const COLORS = ['#0ea5e9', '#10b981', '#f97316', '#8b5cf6', '#ec4899']

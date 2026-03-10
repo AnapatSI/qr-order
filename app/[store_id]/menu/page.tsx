@@ -35,6 +35,7 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
   const [storeName, setStoreName] = useState('Smart Order')
   const searchParams = useSearchParams()
   const tableNo = searchParams.get('table')
+  const [tableError, setTableError] = useState(false)
   const addToCartSimple = useCartStore((state) => state.addToCartSimple)
   const getItemQuantity = useCartStore((state) => state.getItemQuantity)
   const totalItems = useCartStore((state) => state.items.reduce((sum, item) => sum + item.quantity, 0))
@@ -46,6 +47,12 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
       fetchStoreName()
     }
   }, [storeId])
+
+  useEffect(() => {
+    if (!tableNo) {
+      setTableError(true)
+    }
+  }, [tableNo])
 
   const fetchStoreName = async () => {
     const { data } = await supabase.from('stores').select('name').eq('id', storeId).single()
@@ -119,38 +126,53 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f4] pb-24">
+    <div className="min-h-screen bg-[#f5f5f4]">
+      {/* Table Selection Modal */}
+      {tableError && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Select Your Table</h2>
+            <p className="text-sm text-gray-400 mb-4">Please scan QR code or select your table number to continue</p>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                <button
+                  key={num}
+                  onClick={() => {
+                    const newUrl = `${window.location.pathname}?table=${num}`
+                    window.location.href = newUrl
+                  }}
+                  className="bg-[#f5f5f4] hover:bg-[#0ea5e9] hover:text-white rounded-lg py-3 text-sm font-medium transition-colors"
+                >
+                  Table {num}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const newUrl = `${window.location.pathname}?table=1`
+                window.location.href = newUrl
+              }}
+              className="w-full bg-[#0ea5e9] hover:bg-[#0284c7] text-white rounded-lg py-3 text-sm font-medium transition-colors"
+            >
+              Continue with Table 1
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100">
-        <div className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-between mb-3">
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-20">
+        <div className="max-w-5xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-gray-900">{storeName}</h1>
-              <p className="text-xs text-[#0ea5e9] font-medium">Table {tableNo}</p>
+              <p className="text-xs text-gray-400">Table {tableNo || 'Not Selected'}</p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Link
-                href={`/${storeId}/orders?table=${tableNo}`}
-                className="w-10 h-10 bg-[#f5f5f4] rounded-full flex items-center justify-center"
-              >
-                <ClipboardList className="w-5 h-5 text-gray-500" />
+            {tableNo && (
+              <Link href={`/${storeId}/orders?table=${tableNo}`} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors">
+                <ClipboardList className="w-4 h-4" />
               </Link>
-              <button
-                onClick={() => setCartOpen(true)}
-                className="relative w-10 h-10 bg-[#0ea5e9] rounded-full flex items-center justify-center shadow-md"
-              >
-                <ShoppingCart className="w-5 h-5 text-white" />
-                {totalItems > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 bg-[#f97316] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center"
-                  >
-                    {totalItems}
-                  </motion.span>
-                )}
-              </button>
-            </div>
+            )}
           </div>
 
           {/* Search */}
@@ -181,7 +203,6 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
               </button>
             ))}
           </div>
-        </div>
       </div>
 
       {/* Menu Grid */}
