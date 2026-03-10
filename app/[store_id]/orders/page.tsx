@@ -101,27 +101,33 @@ export default function OrderTrackingPage({ params }: { params: Promise<{ store_
         customer_name: review.customerName || null
       })
 
-      if (!error) {
-        // Update store average_rating
-        const { data: allReviews } = await supabase
-          .from('reviews')
-          .select('rating')
-          .eq('store_id', storeId)
-        if (allReviews && allReviews.length > 0) {
-          const avg = allReviews.reduce((s: number, r: any) => s + r.rating, 0) / allReviews.length
-          await supabase.from('stores').update({ average_rating: Math.round(avg * 100) / 100 }).eq('id', storeId)
-        }
-
-        setReviewedOrders(prev => new Set(prev).add(reviewOrderId))
-        setReviewSubmitted(true)
-        setTimeout(() => {
-          setReviewOrderId(null)
-          setReviewSubmitted(false)
-          setReview({ rating: 5, comment: '', customerName: '' })
-        }, 2000)
+      if (error) {
+        console.error('Review insert error:', error)
+        alert('Unable to submit review. Please try again.')
+        return
       }
+
+      // Update store average_rating
+      const { data: allReviews } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('store_id', storeId)
+      
+      if (allReviews && allReviews.length > 0) {
+        const avg = allReviews.reduce((s: number, r: any) => s + r.rating, 0) / allReviews.length
+        await supabase.from('stores').update({ average_rating: Math.round(avg * 100) / 100 }).eq('id', storeId)
+      }
+
+      setReviewedOrders(prev => new Set(prev).add(reviewOrderId))
+      setReviewSubmitted(true)
+      setTimeout(() => {
+        setReviewOrderId(null)
+        setReviewSubmitted(false)
+        setReview({ rating: 5, comment: '', customerName: '' })
+      }, 2000)
     } catch (e) {
       console.error('Review error:', e)
+      alert('Unable to submit review. Please try again.')
     }
     setSubmittingReview(false)
   }

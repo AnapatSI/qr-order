@@ -38,8 +38,9 @@ export default function MenuPage({ params }: { params: Promise<{ store_id: strin
   const [tableError, setTableError] = useState(false)
   const addToCartSimple = useCartStore((state) => state.addToCartSimple)
   const getItemQuantity = useCartStore((state) => state.getItemQuantity)
-  const totalItems = useCartStore((state) => state.items.reduce((sum, item) => sum + item.quantity, 0))
+  const items = useCartStore((state) => state.items)
   const totalPrice = useCartStore((state) => state.totalPrice)
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
 
   useEffect(() => {
     if (storeId) {

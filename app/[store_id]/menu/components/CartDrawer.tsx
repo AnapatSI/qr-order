@@ -69,15 +69,21 @@ export function CartDrawer({ open, onOpenChange, storeId, tableNo }: CartDrawerP
   const handleCallStaff = async () => {
     if (!tableNo) return
     try {
+      // Create a staff notification record
       await supabase
         .from('orders')
-        .update({ status: 'served' })
-        .eq('store_id', storeId)
-        .eq('table_no', tableNo)
-        .eq('status', 'pending')
-      alert('Staff has been notified!')
+        .insert({
+          store_id: storeId,
+          table_no: tableNo,
+          status: 'staff_call',
+          total_price: 0,
+          notes: 'Customer requested staff assistance'
+        })
+      
+      alert('Staff has been notified! They will be at your table shortly.')
     } catch (error) {
       console.error('Error calling staff:', error)
+      alert('Unable to notify staff. Please call the restaurant directly.')
     }
   }
 
