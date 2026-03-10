@@ -164,7 +164,7 @@ export default function MenuManager() {
       }
     } catch (error) {
       console.error('Error in handleSubmit:', error)
-      alert(`Failed to save menu item: ${error.message}`)
+      alert(`Failed to save menu item: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
     setUploading(false)
   }
